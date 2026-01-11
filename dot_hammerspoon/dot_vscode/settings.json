@@ -1,0 +1,6 @@
+{
+    "Lua.workspace.library": [
+        "${workspaceFolder}/Spoons/EmmyLua.spoon/annotations"
+    ],
+    "AllAutocomplete.showCurrentDocument": false
+}
