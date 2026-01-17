@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Preferred audio devices (in priority order)
-PREFERRED_OUTPUT=("Abhijeet's Beoplay H100" "DELL U4025QW" "MacBook Pro Speakers")
-PREFERRED_INPUT=("Abhijeet's Beoplay H100" "Avaya HC020" "MacBook Pro Microphone")
+PREFERRED_OUTPUT=("Abhijeet's EX" "Abhijeet's Beoplay H100" "DELL U4025QW" "MacBook Pro Speakers")
+PREFERRED_INPUT=("Abhijeet's EX" "Abhijeet's Beoplay H100" "Avaya HC020" "MacBook Pro Microphone")
 
 AUDIO_SWITCH="/opt/homebrew/bin/SwitchAudioSource"
 

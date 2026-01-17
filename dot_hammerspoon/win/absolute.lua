@@ -70,4 +70,4 @@ hca_bind("9", function() moveWindow(hs.window.focusedWindow(), 1/5, 0, 3/5, 1) e
 hca_bind("0", function() moveWindow(hs.window.focusedWindow(), 1/5, 0, 3/5, 2/3) end)
 
 -- Move mouse to center of focused window
-h_bind("m", function() Mouse.toCenter() end)
+-- h_bind("m", function() Mouse.toCenter() end)

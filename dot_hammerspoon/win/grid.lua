@@ -116,12 +116,12 @@ hca_bind("k", function() hs.window.focusedWindow().focusWindowNorth() end)
 hca_bind("j", function() hs.window.focusedWindow().focusWindowSouth() end)
 
 -- Center mouse to currently focused screen
-hca_bind("m", function()
-	win = hs.window.focusedWindow()
-    hs.alert.show(win:title(), hs.alert.defaultStyle, hs.screen.mainScreen(), 0.5)
-    hs.mouse.setAbsolutePosition(win:frame().center)
-	mouseHighlight()
-end)
+--hca_bind("m", function()
+--    win = hs.window.focusedWindow()
+--    hs.alert.show(win:title(), hs.alert.defaultStyle, hs.screen.mainScreen(), 0.5)
+--    hs.mouse.setAbsolutePosition(win:frame().center)
+--	mouseHighlight()
+--end)
 
 local function drawGrid(grid, windows)
 	local n=1
@@ -154,19 +154,9 @@ chooser:choices({
          ["text"] = "3x1\n",
       },
       {
-         ["text"] = "2x2\n",
-      },
-      {
          ["text"] = "3x2\n",
-      },
-      {
-         ["text"] = "3x3\n",
-      },
-      {
-         ["text"] = "5x5\n",
-      },
+      }
 })
-
 
 
 hca_bind("o", function()
@@ -190,7 +180,7 @@ end )
 hca_bind("g", function() chooser:show() end )
 
 -- Rearrange windows in the grid
-h_bind("g", function() drawGrid(hs.grid.getGrid(), hs.window.filter.defaultCurrentSpace:getWindows()) end)
+h_bind("a", function() drawGrid(hs.grid.getGrid(), hs.window.filter.defaultCurrentSpace:getWindows()) end)
 
 -- Rearrange all windows in appropriate grid
 hs_bind("g", function()
