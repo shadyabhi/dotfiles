@@ -1,0 +1,10 @@
+{{ $device_type := promptString "device_type (home/work)" -}}
+{{ $email := promptString "email" -}}
+[git]
+    autoCommit = false
+    commitMessageTemplate = "{{ "{{" }} promptString \"Commit message\" {{ "}}" }}"
+    autoPush = false
+
+[data]
+    device_type = {{ $device_type | quote }}
+    email = {{ $email | quote }}

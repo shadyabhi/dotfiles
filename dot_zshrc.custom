@@ -1,0 +1,28 @@
+source ~/.zshrc.zim
+
+for file in `ls ~/.zshrc.d/*`; do
+    source "$file"
+done
+
+# Only start Tmux when shell is opened in iTerm
+start_tmux() {
+    # Check if we're already under tmux
+    [ -n "$TMUX" ] && return 1 2>/dev/null
+    
+    # Only run in iTerm
+    [ "$TERM_PROGRAM" != "iTerm.app" ] && return 1 2>/dev/null
+
+    if tmux list-sessions 2>&1 | grep -q "no server running"; then
+        # Start new if no session exists
+        tmux
+    else
+        # Attach to the most recent session
+        tmux attach-session -d -t "$(tmux list-sessions 2>&1 | head -n1 | cut -d: -f1)"
+    fi
+}
+start_tmux
+
+# Added by Antigravity
+export PATH="/Users/shadyabhi/.antigravity/antigravity/bin:$PATH"
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
