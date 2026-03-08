@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Preferred audio devices (in priority order)
-PREFERRED_OUTPUT=("Abhijeet's EX" "Abhijeet's Beoplay H100" "DELL U4025QW" "MacBook Pro Speakers")
-PREFERRED_INPUT=("Abhijeet's EX" "Abhijeet's Beoplay H100" "Avaya HC020" "MacBook Pro Microphone")
+PREFERRED_OUTPUT=("Bose QC Ultra 2 Earbuds" "Abhijeet's EX" "Abhijeet's Beoplay H100" "DELL U4025QW" "MacBook Pro Speakers")
+PREFERRED_INPUT=("Bose QC Ultra 2 Earbuds" "Insta360 Link 2 Pro" "Abhijeet's EX" "Abhijeet's Beoplay H100" "Avaya HC020" "MacBook Pro Microphone")
 
 AUDIO_SWITCH="/opt/homebrew/bin/SwitchAudioSource"
 
@@ -29,11 +29,8 @@ set_audio_device() {
     return 1
 }
 
-# Set output device
-output_result=$(set_audio_device "output" "${PREFERRED_OUTPUT[@]}")
-
-# Set input device
-input_result=$(set_audio_device "input" "${PREFERRED_INPUT[@]}")
+result_input=$(set_audio_device "input" "${PREFERRED_INPUT[@]}")
+result_output=$(set_audio_device "output" "${PREFERRED_OUTPUT[@]}")
 
 # Send single summary notification
-osascript -e "display notification \"Output: $output_result \nInput: $input_result\" with title \"Audio Devices Set\""
+osascript -e "display notification \"Preferred audio device set: Input: $result_input, Output: $result_output\" with title \"Audio Devices Set\""
