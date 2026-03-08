@@ -1,5 +1,0 @@
-# pack-refs with: peeled fully-peeled sorted 
-a8eb8547fad03ca64a66da8e304e44e5b3046144 refs/remotes/origin/check-dat-file
-b974e6fb878d383c2e7c9391a1b5ffcfa5211313 refs/remotes/origin/compinit
-c42732a83d0b8a3501b8e18d9bcbf2d723722645 refs/remotes/origin/generate-dat-file
-02168709e2aa3b34aa18a8a4b753b31787c532e2 refs/remotes/origin/master
