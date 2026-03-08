@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Read the current content from stdin
+current_content=$(cat)
+
+# Check if the block is already present
+if ! printf "%s" "$current_content" | grep -q "~/.gitconfig.shared"; then
+    # Ensure there's a newline before appending if content is not empty and missing one
+    if [ -n "$current_content" ] && [ "$(printf "%s" "$current_content" | tail -c 1)" != "$'\n'" ]; then
+        current_content="${current_content}"$'\n'
+    fi
+
+    # Append the include block
+    current_content="${current_content}"$'\n'"# Included in all machines
+[include]
+    path = ~/.gitconfig.shared"
+fi
+
+# Output everything and ensure exactly one newline at the end
+# Strip any trailing newlines first, then add one back
+printf "%s\n" "${current_content%$'\n'}"
