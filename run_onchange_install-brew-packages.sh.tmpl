@@ -1,0 +1,17 @@
+#!/bin/bash
+# brew.lst hash: {{ include "private_dot_config/dotfiles/brew.lst" | sha256sum }}
+set -euo pipefail
+
+if ! command -v brew &>/dev/null; then
+    echo "brew not found, skipping package installation"
+    exit 0
+fi
+
+while IFS= read -r package || [[ -n "$package" ]]; do
+    package=$(echo "$package" | xargs)
+    [[ -z "$package" || "$package" == \#* ]] && continue
+    if ! brew list --formula "$package" &>/dev/null; then
+        echo "Installing $package..."
+        brew install "$package"
+    fi
+done < {{ joinPath .chezmoi.homeDir ".config/dotfiles/brew.lst" | quote }}
