@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Chezmoi modify script for .zshrc
+#
+# Ensures `source ~/.zshrc.custom` is present in .zshrc (idempotently).
+# If SDKMAN is installed, its init block MUST remain at the end of the file,
+# so we insert our block *before* the SDKMAN comment line rather than appending.
+
+# Read the current content from stdin
+current_content=$(cat)
+
+MARKER="# Entry-point to our zshrc"
+BLOCK="${MARKER}
+source ~/.zshrc.custom"
+
+# Check if the block is already present
+if ! printf "%s" "$current_content" | grep -q "$MARKER"; then
+    SDKMAN_LINE='#THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!'
+
+    if printf "%s" "$current_content" | grep -qF "$SDKMAN_LINE"; then
+        # Insert our block before the SDKMAN line
+        current_content=$(printf "%s" "$current_content" | sed "/$SDKMAN_LINE/i\\
+${MARKER}\\
+source ~/.zshrc.custom\\
+")
+    else
+        # Append to end of file
+        if [ -n "$current_content" ] && [ "$(printf "%s" "$current_content" | tail -c 1)" != "$'\n'" ]; then
+            current_content="${current_content}"$'\n'
+        fi
+        current_content="${current_content}"$'\n'"${BLOCK}"
+    fi
+fi
+
+# Output everything and ensure exactly one newline at the end
+printf "%s\n" "${current_content%$'\n'}"
