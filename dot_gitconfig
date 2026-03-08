@@ -1,3 +1,0 @@
-# Included in all machines
-[include]
-    path = ~/.gitconfig.shared
