@@ -1,5 +1,8 @@
-{{ $device_type := promptString "device_type (home/work)" -}}
+{{- $device_type_choices := list "personal" "work" -}}
+{{- $device_type := promptChoice "What type of device?" $device_type_choices -}}
+
 {{ $email := promptString "email" -}}
+
 [git]
     autoCommit = false
     commitMessageTemplate = "{{ "{{" }} promptString \"Commit message\" {{ "}}" }}"
