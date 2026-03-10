@@ -1,7 +1,0 @@
-export PATH=".:$PATH:$HOME/.local/bin"
-
-# Apps
-export PATH="~/.antigravity/antigravity/bin:$PATH"
-
-# Scripts
-path=(~/scripts/*(/N) $path)
