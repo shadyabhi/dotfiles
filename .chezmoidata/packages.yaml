@@ -9,7 +9,6 @@ packages:
   - tldev/tap
   brews:
   - act
-  - aider
   - ansible
   - apache-flink
   - apktool
@@ -21,7 +20,6 @@ packages:
   - curl
   - dash-shell
   - displayplacer
-  - docker
   - entr
   - envoy
   - ffmpeg
@@ -43,14 +41,11 @@ packages:
   - ncdu
   - neovim
   - nss
-  - opencode
   - pam-reattach
   - pandoc
   - parallel
   - pipx
-  - python@3.13
   - rtmpdump
-  - rust
   - switchaudio-osx
   - tmux
   - urlview
@@ -59,6 +54,14 @@ packages:
   - wget
   - yt-dlp
   - zoxide
+  # device_type specific brews, only installed on matching device
+  personal_brews:
+  - aider
+  - docker
+  - opencode
+  - python@3.13
+  - rust
+  work_brews: []
   casks:
   - alfred
   - android-platform-tools
