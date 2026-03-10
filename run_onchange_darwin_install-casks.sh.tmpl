@@ -10,7 +10,28 @@ fi
 
 brew bundle --file=/dev/stdin <<EOF
 {{ range .packages.casks -}}
+{{ if not (has . $.meta.enable_sudo) -}}
 cask {{ . | quote }}
 {{ end -}}
+{{ end -}}
+{{ if eq .device_type "personal" -}}
+{{ range .packages.personal_casks -}}
+cask {{ . | quote }}
+{{ end -}}
+{{ end -}}
+{{ if eq .device_type "work" -}}
+{{ range .packages.work_casks -}}
+cask {{ . | quote }}
+{{ end -}}
+{{ end -}}
 EOF
+
+{{ if .meta.enable_sudo -}}
+# Install casks that require sudo separately, allowing failure
+{{ range .packages.casks -}}
+{{ if has . $.meta.enable_sudo -}}
+brew install --cask {{ . | quote }} || echo "Skipped {{ . }} (requires sudo)"
+{{ end -}}
+{{ end -}}
+{{ end -}}
 {{ end -}}

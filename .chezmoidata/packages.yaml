@@ -1,4 +1,7 @@
 ---
+meta:
+  # Casks that require sudo to install/update
+  enable_sudo: []
 packages:
   taps:
   - derailed/k9s
@@ -29,6 +32,7 @@ packages:
   - gemini-cli
   - gh
   - gnu-sed
+  - goreleaser
   - gyb
   - haproxy
   - hurl
@@ -69,7 +73,6 @@ packages:
   - androidtool
   - anki
   - chromedriver
-  - cursor
   - discord
   - eclipse-ide
   - elmedia-player
@@ -78,16 +81,14 @@ packages:
   - font-fira-code
   - font-fira-code-nerd-font
   - font-hack-nerd-font
-  - github
-  - goreleaser
   - hammerspoon
   - intellij-idea
   - lark
-  - microsoft-auto-update
-  - microsoft-teams
   - obsidian
-  - posturr
+
   - signal
   - slack
-  - spotify
   - vlc
+  personal_casks:
+  - cursor
+  work_casks: []
