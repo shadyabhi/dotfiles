@@ -1,5 +1,0 @@
-# Not personal device
-{{- if ne .chezmoi.username "shadyabhi" }}
-.gitignore
-{{- end }}
-
