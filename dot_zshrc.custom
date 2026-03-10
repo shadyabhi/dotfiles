@@ -1,1 +1,6 @@
 source ~/.zshrc.zim
+
+# Source files, keep things organized
+for file in ~/.zshrc.d/*; do
+    source "$file"
+done
