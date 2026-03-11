@@ -1,0 +1,56 @@
+#!/bin/bash
+# yo - Run claude with a prompt and notify when done
+
+if [ -z "$1" ]; then
+  # No args: open editor to write prompt
+  tmpfile=$(mktemp "${TMPDIR:-/tmp}/yo-prompt.XXXXXX")
+  trap 'rm -f "$tmpfile"' EXIT
+  ${EDITOR:-vim} "$tmpfile"
+  prompt=$(cat "$tmpfile")
+  if [ -z "$prompt" ]; then
+    echo "Empty prompt, aborting."
+    exit 1
+  fi
+else
+  prompt="$*"
+fi
+
+start_time=$(date +%s)
+output=$(claude -p "$prompt" 2>&1)
+exit_code=$?
+end_time=$(date +%s)
+elapsed=$((end_time - start_time))
+
+# Format duration
+if [ $elapsed -ge 3600 ]; then
+  duration="$((elapsed / 3600))h $((elapsed % 3600 / 60))m"
+elif [ $elapsed -ge 60 ]; then
+  duration="$((elapsed / 60))m $((elapsed % 60))s"
+else
+  duration="${elapsed}s"
+fi
+
+echo "$output"
+
+# Truncate for alert display
+short_prompt="${prompt:0:60}"
+[ ${#prompt} -gt 60 ] && short_prompt="${short_prompt}..."
+short_output="${output:0:500}"
+[ ${#output} -gt 500 ] && short_output="${short_output}..."
+
+if [ $exit_code -eq 0 ]; then
+  title="Claude finished answering via yo: ✅ (${duration})"
+else
+  title="Claude finished answering via yo: ❌ (${duration})"
+fi
+
+# Use heredoc to safely pass text with special chars to osascript
+osascript <<EOF
+set theTitle to "$(sed 's/["\\]/\\&/g' <<< "$title")"
+set thePrompt to "$(sed 's/["\\]/\\&/g' <<< "$short_prompt")"
+set theOutput to "$(sed 's/["\\]/\\&/g' <<< "$short_output")"
+set msg to "📝 " & thePrompt & "
+
+💬 " & theOutput
+display alert theTitle message msg buttons {"OK"} default button "OK"
+EOF

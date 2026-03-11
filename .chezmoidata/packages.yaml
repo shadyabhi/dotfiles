@@ -18,6 +18,7 @@ packages:
   - bitwarden-cli
   - bpython
   - buildifier
+  - cdb
   - chezmoi
   - cloc
   - curl
