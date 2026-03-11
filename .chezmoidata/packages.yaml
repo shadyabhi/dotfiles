@@ -32,6 +32,7 @@ packages:
   - fzf
   - gemini-cli
   - gh
+  - git-delta
   - gnu-sed
   - goreleaser
   - gyb
