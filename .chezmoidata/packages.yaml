@@ -22,10 +22,8 @@ packages:
     - chezmoi
     - cloc
     - curl
-    - dash-shell
     - displayplacer
     - entr
-    - envoy
     - ffmpeg
     - flock
     - fx
@@ -64,7 +62,6 @@ packages:
     - zoxide
   # device_type specific brews, only installed on matching device
   personal_brews:
-    - aider
     - docker
     - opencode
     - python@3.13
@@ -90,7 +87,6 @@ packages:
     - obsidian
     - signal
     - slack
-    - vlc
   personal_casks:
     - cursor
   work_casks: []
