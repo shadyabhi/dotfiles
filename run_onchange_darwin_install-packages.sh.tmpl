@@ -1,14 +1,27 @@
 {{ if eq .chezmoi.os "darwin" -}}
 #!/bin/bash
 
+# .chezmoidata/packages.yaml hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
+
 set -euo pipefail
 
 if ! command -v brew &>/dev/null; then
-    echo "brew not found, skipping brews"
+    echo "brew not found, skipping package installation"
     exit 0
 fi
 
+if git rev-parse HEAD@{1} &>/dev/null; then
+    echo "Changes in packages.yaml since last pull/commit:"
+    git log HEAD@{1}.. --stat -- .chezmoidata/packages.yaml || true
+fi
+
 BREWFILE=$(cat <<EOF
+# Taps
+{{ range .packages.taps -}}
+tap {{ . | quote }}
+{{ end -}}
+
+# Brews
 {{ range .packages.brews -}}
 brew {{ . | quote }}
 {{ end -}}
@@ -22,9 +35,27 @@ brew {{ . | quote }}
 brew {{ . | quote }}
 {{ end -}}
 {{ end -}}
+
+# Casks
+{{ range .packages.casks -}}
+{{ if not (has . $.meta.enable_sudo) -}}
+cask {{ . | quote }}
+{{ end -}}
+{{ end -}}
+{{ if eq .device_type "personal" -}}
+{{ range .packages.personal_casks -}}
+cask {{ . | quote }}
+{{ end -}}
+{{ end -}}
+{{ if eq .device_type "work" -}}
+{{ range .packages.work_casks -}}
+cask {{ . | quote }}
+{{ end -}}
+{{ end -}}
 EOF
 )
 
+echo "Running brew bundle..."
 if ! echo "$BREWFILE" | brew bundle --file=/dev/stdin; then
     echo "brew bundle failed, identifying missing packages..."
     MISSING_PACKAGES=$(echo "$BREWFILE" | brew bundle check --file=/dev/stdin --verbose | grep "The following .* are not installed:" -A 1000 | grep -v "The following .* are not installed:" || true)
@@ -35,10 +66,7 @@ if ! echo "$BREWFILE" | brew bundle --file=/dev/stdin; then
             [[ -z "$package" ]] && continue
             package=$(echo "$package" | xargs) # trim whitespace
             echo "Installing: $package"
-            # We need to determine if it's a brew, cask or tap for the individual install command
-            # but brew bundle is smarter, so we can just use it for the individual line
-            # However, the output of 'brew bundle check --verbose' is just names.
-            # Let's use a simpler approach: if it's missing, find the line in BREWFILE that contains it.
+            
             line=$(grep -E "^(brew|cask|tap) \"$package\"" <<< "$BREWFILE" || grep -E "^(brew|cask|tap) '$package'" <<< "$BREWFILE" || true)
             if [[ -n "$line" ]]; then
                 if ! echo "$line" | brew bundle --file=/dev/stdin; then
@@ -51,4 +79,15 @@ if ! echo "$BREWFILE" | brew bundle --file=/dev/stdin; then
         done <<< "$MISSING_PACKAGES"
     fi
 fi
+
+{{ if .meta.enable_sudo -}}
+# Install casks that require sudo separately, allowing failure
+{{ range .packages.casks -}}
+{{ if has . $.meta.enable_sudo -}}
+echo "Installing sudo-required cask: {{ . }}"
+brew install --cask {{ . | quote }} || echo "Skipped {{ . }} (requires sudo)"
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
 {{ end -}}
