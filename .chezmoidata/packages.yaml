@@ -84,6 +84,7 @@ packages:
     - font-hack-nerd-font
     - hammerspoon
     - intellij-idea
+    - markedit
     - obsidian
     - signal
     - slack

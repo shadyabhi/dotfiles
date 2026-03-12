@@ -1,0 +1,2 @@
+# Markdown editor
+alias md="open -a MarkEdit" 
