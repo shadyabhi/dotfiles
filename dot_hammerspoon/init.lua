@@ -5,6 +5,7 @@ require "win/absolute"
 require "win/grid"
 require "win/switch"
 require "win/spaces"
+require "win/auto_close"
 require "audio_watcher"
 
 -- Load lua annotations
