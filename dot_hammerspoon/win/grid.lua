@@ -65,7 +65,7 @@ hca_bind("left", function()
 	win, screen, sg, g = getWinInfo()
 	if win == nil then return end
 
-    if g.x + g.w >= sg.w and g.x ~= 0 then
+    if g.x ~= 0 then
         g.x = g.x - 1
         g.w = g.w + 1
         hs.grid.set(win, g)
