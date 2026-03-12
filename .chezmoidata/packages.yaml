@@ -79,7 +79,6 @@ packages:
     - chromedriver
     - deskpad
     - discord
-    - eclipse-ide
     - elmedia-player
     - espanso
     - firefox

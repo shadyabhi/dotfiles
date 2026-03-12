@@ -8,9 +8,33 @@ if ! command -v brew &>/dev/null; then
     exit 0
 fi
 
-brew bundle --file=/dev/stdin <<EOF
+BREWFILE=$(cat <<EOF
 {{ range .packages.taps -}}
 tap {{ . | quote }}
 {{ end -}}
 EOF
+)
+
+if ! echo "$BREWFILE" | brew bundle --file=/dev/stdin; then
+    echo "brew bundle failed, identifying missing packages..."
+    MISSING_PACKAGES=$(echo "$BREWFILE" | brew bundle check --file=/dev/stdin --verbose | grep "The following .* are not installed:" -A 1000 | grep -v "The following .* are not installed:" || true)
+    
+    if [[ -n "$MISSING_PACKAGES" ]]; then
+        echo "Attempting to install missing packages individually..."
+        while IFS= read -r package; do
+            [[ -z "$package" ]] && continue
+            package=$(echo "$package" | xargs) # trim whitespace
+            echo "Installing: $package"
+            line=$(grep -E "^(brew|cask|tap) \"$package\"" <<< "$BREWFILE" || grep -E "^(brew|cask|tap) '$package'" <<< "$BREWFILE" || true)
+            if [[ -n "$line" ]]; then
+                if ! echo "$line" | brew bundle --file=/dev/stdin; then
+                    echo "FAILED: $line"
+                fi
+            else
+                echo "Could not find Brewfile line for $package, trying 'brew tap $package'"
+                brew tap "$package" || echo "FAILED: brew tap $package"
+            fi
+        done <<< "$MISSING_PACKAGES"
+    fi
+fi
 {{ end -}}
