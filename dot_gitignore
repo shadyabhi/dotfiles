@@ -1,2 +1,5 @@
-.CodeReview
+# MacOS
 .DS_Store
+
+# Notes folder that I don't check-in
+.notes
