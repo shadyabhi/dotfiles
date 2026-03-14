@@ -8,14 +8,12 @@ require "win/spaces"
 require "win/auto_close"
 require "audio_watcher"
 
--- Load lua annotations
-hs.loadSpoon('EmmyLua')
+-- Auto-install and load spoons
+hs.loadSpoon("SpoonInstall")
+spoon.SpoonInstall:andUse("EmmyLua")
+spoon.SpoonInstall:andUse("ReloadConfiguration", { start = true })
 
 -- Enable Apple Script support
 hs.allowAppleScript(true)
-
--- Load spoons
-hs.loadSpoon("ReloadConfiguration")
-spoon.ReloadConfiguration:start()
 
 hs.alert.show("Hammerspoon reload finished successfully!")

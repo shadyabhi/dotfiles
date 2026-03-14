@@ -1,0 +1,4 @@
+["Spoons/PaperWM.spoon"]
+type = "archive"
+url = "https://github.com/mogenson/PaperWM.spoon/archive/main.tar.gz"
+stripComponents = 1

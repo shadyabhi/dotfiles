@@ -1,12 +1,19 @@
 local logger = hs.logger.new('grid','info')
 
 -- Constants
-local textStyle = {
+local letterStyle = {
   font = {
     name = hs.styledtext.defaultFonts.boldSystem,
-    size = 80,
+    size = 36,
   },
   color = {white = 1, alpha = 1},
+}
+local titleStyle = {
+  font = {
+    name = hs.styledtext.defaultFonts.system,
+    size = 16,
+  },
+  color = {white = 1, alpha = 0.85},
 }
 local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -34,8 +41,12 @@ function clearTargetBox(target)
     target.box:setFillColor({white = 0.125, alpha = 0.8})
     target.box:hide(0.3)
     hs.timer.doAfter(0.3, function() target.box:delete() end)
+    target.letterBg:hide(0.3)
+    hs.timer.doAfter(0.3, function() target.letterBg:delete() end)
     target.text:hide(0.3)
     hs.timer.doAfter(0.3, function() target.text:delete() end)
+    target.title:hide(0.3)
+    hs.timer.doAfter(0.3, function() target.title:delete() end)
     target.app:hide(0.3)
     hs.timer.doAfter(0.3, function() target.app:delete() end)
 end
@@ -106,65 +117,123 @@ function buildTargets()
     end
   end
   table.sort(filteredWindows, function(a, b)
-    af = a:frame()
-    bf = b:frame()
-
+    local af = a:frame()
+    local bf = b:frame()
     if af.x ~= bf.x then return af.x < bf.x end
     if af.y ~= bf.y then return af.y < bf.y end
     return nil
   end)
 
-  -- Parse, render, and bind shortcuts
+  -- First pass: assign letters to all windows
+  local entries = {}
   for i, window in ipairs(filteredWindows) do
-    local t = {window = window}
+    local title = window:application():title()
+    local appName = nil
 
-    -- Convert window's application initial to a shortcut
-    local appName = window:application():title():sub(1, 1):upper()
-    if not alphabet:find(appName) then
-      appName = "A"
-    end
-    local tries = 0
-    while targets[appName] ~= nil do
-      local i = (alphabet:find(appName) % #alphabet) + 1
-      appName = alphabet:sub(i, i)
-      tries = tries + 1
-      if tries == 26 then return end -- we've run out of shortcuts
+    for word in title:gmatch("%S+") do
+      local letter = word:sub(1, 1):upper()
+      if alphabet:find(letter, 1, true) and not targets[letter] then
+        appName = letter
+        break
+      end
     end
 
-    -- Render shortcut
-    local styledText = hs.styledtext.new(appName, textStyle)
-    local textDims = hs.drawing.getTextDrawingSize(styledText)
-    local frame = window:frame()
-    local textRect = hs.geometry.rect(
-      frame.x + frame.w / 2 - textDims.w / 2 - 2,
-      frame.y + frame.h / 2 - textDims.h / 2 - 16,
-      textDims.w + 8,
-      textDims.h)
-    local boxRect = hs.geometry.rect(
-      frame.x + frame.w / 2 - textDims.w / 2 - 26,
-      frame.y + frame.h / 2 - textDims.h / 2 - 24,
-      textDims.w + 52,
-      textDims.h + 48)
-    local appRect = hs.geometry.rect(
-      frame.x + frame.w / 2 - 16,
-      frame.y + frame.h / 2 + 20,
-      32,
-      32)
-    t.box = hs.drawing.rectangle(boxRect)
+    if not appName then
+      for ch in title:gmatch("%a") do
+        local letter = ch:upper()
+        if not targets[letter] then
+          appName = letter
+          break
+        end
+      end
+    end
+
+    if not appName then
+      for ch in alphabet:gmatch(".") do
+        if not targets[ch] then
+          appName = ch
+          break
+        end
+      end
+    end
+
+    if not appName then break end
+
+    targets[appName] = {window = window}
+    entries[#entries + 1] = {letter = appName, window = window, title = title}
+  end
+
+  -- Layout constants
+  local pad = 12
+  local iconSize = 28
+  local gap = 8
+  local rowH = 44
+  local rowGap = 4
+  local maxTitleW = 300
+  local letterColW = 36
+
+  -- Fixed row width so all rows align
+  local rowW = pad + iconSize + gap + letterColW + gap + maxTitleW + pad
+
+  -- Compute grid position centered on the focused screen
+  local screen = hs.screen.mainScreen():frame()
+  local totalH = #entries * rowH + (#entries - 1) * rowGap
+  local gridX = screen.x + (screen.w - rowW) / 2
+  local gridY = screen.y + (screen.h - totalH) / 2
+
+  -- Second pass: render each row
+  for idx, entry in ipairs(entries) do
+    local t = targets[entry.letter]
+    local y = gridY + (idx - 1) * (rowH + rowGap)
+
+    -- Row background
+    t.box = hs.drawing.rectangle(hs.geometry.rect(gridX, y, rowW, rowH))
     t.box:setLevel("overlay")
-    t.box:setFillColor({white = 0.125, alpha = 0.7})
+    t.box:setFillColor({white = 0.1, alpha = 0.88})
     t.box:setFill(true)
     t.box:setStroke(false)
     t.box:setRoundedRectRadii(8, 8)
-    t.text = hs.drawing.text(textRect, styledText)
-    t.text:setLevel("overlay")
-    t.app = hs.drawing.appImage(appRect, window:application():bundleID())
-    t.box:show()
-    t.text:show()
-    t.app:show()
 
-    -- Add to targets
-    targets[appName] = t
+    -- App icon
+    local iconX = gridX + pad
+    local iconY = y + (rowH - iconSize) / 2
+    t.app = hs.drawing.appImage(
+      hs.geometry.rect(iconX, iconY, iconSize, iconSize),
+      entry.window:application():bundleID())
+    t.app:setLevel("overlay")
+
+    -- Letter badge
+    local lbX = iconX + iconSize + gap
+    local lbY = y + (rowH - letterColW) / 2
+    t.letterBg = hs.drawing.rectangle(hs.geometry.rect(lbX, lbY, letterColW, letterColW))
+    t.letterBg:setLevel("overlay")
+    t.letterBg:setFillColor({red = 0.2, green = 0.5, blue = 1, alpha = 0.9})
+    t.letterBg:setFill(true)
+    t.letterBg:setStroke(false)
+    t.letterBg:setRoundedRectRadii(6, 6)
+
+    local styledLetter = hs.styledtext.new(entry.letter, letterStyle)
+    local letterDims = hs.drawing.getTextDrawingSize(styledLetter)
+    local ltX = lbX + (letterColW - letterDims.w) / 2
+    local ltY = lbY + (letterColW - letterDims.h) / 2 - 1
+    t.text = hs.drawing.text(hs.geometry.rect(ltX, ltY, letterDims.w + 4, letterDims.h), styledLetter)
+    t.text:setLevel("overlay")
+
+    -- Application name
+    local displayTitle = entry.window:application():title()
+    if #displayTitle > 40 then displayTitle = displayTitle:sub(1, 38) .. ".." end
+    local styledTitle = hs.styledtext.new(displayTitle, titleStyle)
+    local titleDims = hs.drawing.getTextDrawingSize(styledTitle)
+    local ttX = lbX + letterColW + gap
+    local ttY = y + (rowH - titleDims.h) / 2
+    t.title = hs.drawing.text(hs.geometry.rect(ttX, ttY, maxTitleW, titleDims.h), styledTitle)
+    t.title:setLevel("overlay")
+
+    t.box:show()
+    t.app:show()
+    t.letterBg:show()
+    t.text:show()
+    t.title:show()
   end
 
   return targets
@@ -175,7 +244,9 @@ end
 function clearTargets()
   for k in pairs(targets) do
     targets[k].box:delete()
+    targets[k].letterBg:delete()
     targets[k].text:delete()
+    targets[k].title:delete()
     targets[k].app:delete()
   end
   targets = {}
