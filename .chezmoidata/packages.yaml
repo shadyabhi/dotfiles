@@ -22,6 +22,7 @@ packages:
     - chezmoi
     - cloc
     - curl
+    - direnv
     - displayplacer
     - entr
     - ffmpeg
@@ -52,6 +53,7 @@ packages:
     - ripgrep
     - rtmpdump
     - switchaudio-osx
+    - terminal-notifier
     - tmux
     - urlview
     - uv
