@@ -13,4 +13,5 @@ bindkey "^ " magic-space           # control-space to bypass completion
 bindkey -M isearch " " magic-space # normal space during searches
 
 alias md="open -a MarkEdit" 
+alias cm="chezmoi"
 alias -g CCR="claude --resume"
