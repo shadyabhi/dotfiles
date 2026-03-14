@@ -37,14 +37,14 @@
 [alias]
     st = status -s --untracked-files=no
     # Show 'diff --cached' of current commit
-    ci = commit --verbose
+    c = commit --verbose
     # Show 'diff' while commiting as a comment
     ca = commit -a --verbose
     br = branch
     co = checkout
     d = diff
     dmc = diff --diff-filter=U
-    a = add
+    a = "!f() { git add \"$@\" && git status; }; f"
     ai = "!f() { sel=$(git ls-files --modified --others --exclude-standard | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
     aif = "!f() { sel=$(git ls-files --modified --others --exclude-standard | grep -v '/$' | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
     aid = "!f() { sel=$({ git diff --name-only; git ls-files --others --exclude-standard; } | sed 's|[^/]*$||' | sed 's|/$||' | sort -u | grep . | fzf --multi --preview 'git status --short -- {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
