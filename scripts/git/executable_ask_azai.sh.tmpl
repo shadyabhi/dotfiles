@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Generic script to ask Azure OpenAI
+# Usage: echo "user content" | ask_azai.sh "system prompt"
+
+SYSTEM_PROMPT="$1"
+USER_CONTENT=$(cat -)
+
+if [ -z "$SYSTEM_PROMPT" ]; then
+  SYSTEM_PROMPT="You are a helpful assistant."
+fi
+
+if [ -z "$USER_CONTENT" ]; then
+    echo "❌ No content provided via stdin."
+    exit 1
+fi
+
+response=$(curl -s https://shadyabhi.openai.azure.com/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ (bitwarden "item" "az_openai_key").notes }}" \
+  -d "$(jq -n --arg system "$SYSTEM_PROMPT" --arg user "$USER_CONTENT" '{
+    model: "gpt-oss-20b",
+    messages: [
+      {
+        role: "system", 
+        content: $system
+      },
+      {
+        role: "user", 
+        content: $user
+      }
+    ]
+  }')")
+
+# Extract content safely
+# 1. Use jq to get raw output
+# 2. Use head to get first line
+# 3. Use sed to trim leading/trailing whitespace (xargs mangles quotes)
+commit_msg=$(printf '%s\n' "$response" | jq --raw-output '.choices[0].message.content // empty' | head -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+if [ -z "$commit_msg" ] || [ "$commit_msg" = "null" ]; then
+    echo "❌ Error: Could not generate response. Full response:" >&2
+    echo "$response" >&2
+    exit 1
+fi
+
+echo "$commit_msg"

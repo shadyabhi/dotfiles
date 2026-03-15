@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# aic: AI-powered Git Commit with <component>: <summary> format
+aic() {
+  # 1. Capture staged changes
+  local diff=$(git diff --cached)
+
+  if [ -z "$diff" ]; then
+    echo "❌ No staged changes found. Use 'git add' first."
+    return 1
+  fi
+
+  echo "🤖 Requesting commit message in '<component>: <summary>' format..."
+
+  # 2. Call generalized Azure OpenAI script
+  local system_prompt="You are a technical assistant. Write a concise git commit message based on the diff, only 72 chars. Follow the format: <component>: <summary>. Identify the main component or file being changed for the prefix. Output ONLY the message text. No explanations."
+  
+  # Ensure we find the script in the same directory
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local commit_msg=$(printf '%s\n' "$diff" | "$script_dir/ask_azai.sh" "$system_prompt")
+
+  # 3. Error handling
+  if [ -z "$commit_msg" ]; then
+    echo "❌ Error: Could not generate message."
+    return 1
+  fi
+
+  # 4. Open Vim with pre-filled message
+  # -m: sets the AI message
+  # -e: opens the editor to let you review/edit
+  # -v: shows the diff in the editor
+  git commit -v -m "$commit_msg" -e
+}
+
+# Run the function
+aic
