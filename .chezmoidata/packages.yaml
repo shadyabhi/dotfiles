@@ -50,6 +50,7 @@ packages:
     - pandoc
     - parallel
     - pipx
+    - raine/claude-history/claude-history
     - ripgrep
     - rtmpdump
     - switchaudio-osx
