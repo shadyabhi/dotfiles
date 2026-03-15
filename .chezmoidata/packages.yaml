@@ -15,6 +15,7 @@ packages:
     - ansible
     - apache-flink
     - apktool
+    - azure-cli
     - bitwarden-cli
     - bpython
     - buildifier
