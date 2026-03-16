@@ -1,2 +1,7 @@
 {{- /* chezmoi:modify-template */ -}}
-{{ fromJson .chezmoi.stdin | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") | toPrettyJson }}
+{{- $data := fromJson .chezmoi.stdin -}}
+{{- $data = $data | setValueAtPath "model" "claude-opus-4-6" -}}
+{{- $data = $data | setValueAtPath "outputStyle" "default" -}}
+{{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
+{{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
+{{ $data | toPrettyJson }}
