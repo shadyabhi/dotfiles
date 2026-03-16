@@ -1,6 +1,10 @@
 {{- /* chezmoi:modify-template */ -}}
 {{- $data := fromJson .chezmoi.stdin -}}
-{{- $data = $data | setValueAtPath "model" "claude-opus-4-6" -}}
+{{- if eq .chezmoi.config.data.device_type "work" -}}
+{{-   $data = $data | setValueAtPath "model" "opus[1m]" -}}
+{{- else -}}
+{{-   $data = $data | setValueAtPath "model" "opus" -}}
+{{- end -}}
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
