@@ -1,17 +1,8 @@
-#!/bin/bash
+#!/bin/zsh -l
 
 # dot_zshrc.zim hash: {{ include "dot_zshrc.zim" | sha256sum }}
 # dot_zimrc.d contents hash: {{ range (glob "dot_zimrc.d/*") }}{{ . | include | sha256sum }}{{ end }}
 # private_dot_zimrc hash: {{ include "private_dot_zimrc" | sha256sum }}
 
-ZIM_HOME="${ZDOTDIR:-$HOME}/.zim"
-ZIM_FW="${ZIM_HOME}/zimfw.zsh"
-
-if [ -f "$ZIM_FW" ]; then
-    echo "Running zimfw install..."
-    zsh "$ZIM_FW" install
-    echo "Running zimfw uninstall..."
-    zsh "$ZIM_FW" uninstall
-else
-    echo "zimfw.zsh not found at $ZIM_FW. Skipping zimfw update."
-fi
+source ~/.zshrc
+zimfw update && zimfw install && zimfw uninstall
