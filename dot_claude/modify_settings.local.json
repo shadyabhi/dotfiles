@@ -7,6 +7,10 @@
 {{- $perms := list
   "Bash(find)"
   "Bash(make run:*)"
+  "Bash(du:*)"
+  "Bash(cd:*)"
+  "Bash(npx vite:*)"
+  "Bash(npm install:*)"
 -}}
 {{- if not (hasKey $data "permissions") -}}
 {{-   $data = $data | setValueAtPath "permissions" (dict "allow" list) -}}
