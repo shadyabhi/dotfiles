@@ -2,6 +2,6 @@
 
 # Don't change dir
 (
-cd /Users/abhijeetr/.local/share/chezmoi;
+cd $HOME/.local/share/chezmoi;
 git status
 )
