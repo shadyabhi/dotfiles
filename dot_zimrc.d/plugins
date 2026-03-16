@@ -1,7 +1,8 @@
 # Dependencies:- 
 # - Installs fira code, then select in Terminal app: `brew install font-fira-code`
 
-zmodule prompt-pwd
-zmodule git-info
+#zmodule prompt-pwd
+#zmodule git-info
 
-zmodule agnoster
+#zmodule agnoster
+zmodule joke/zim-starship
