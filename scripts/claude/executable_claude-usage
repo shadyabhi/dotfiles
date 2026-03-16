@@ -1,1 +1,3 @@
-npx ccusage@latest
+#!/bin/bash
+
+npx ccusage@latest $1
