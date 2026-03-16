@@ -4,4 +4,19 @@
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
+{{- $perms := list
+  "Bash(find)"
+  "Bash(make run:*)"
+-}}
+{{- if not (hasKey $data "permissions") -}}
+{{-   $data = $data | setValueAtPath "permissions" (dict "allow" list) -}}
+{{- end -}}
+{{- if not (hasKey $data.permissions "allow") -}}
+{{-   $_ := set $data.permissions "allow" list -}}
+{{- end -}}
+{{- range $perms -}}
+{{-   if not (has . $data.permissions.allow) -}}
+{{-     $_ := set $data.permissions "allow" (append $data.permissions.allow .) -}}
+{{-   end -}}
+{{- end -}}
 {{ $data | toPrettyJson }}
