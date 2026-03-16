@@ -4,15 +4,14 @@
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
-{{- $perms := list
-  "Bash(find)"
-  "Bash(make run:*)"
-  "Bash(du:*)"
-  "Bash(cd:*)"
-  "Bash(npx vite:*)"
-  "Bash(npm install:*)"
-  "Bash(npx vitx)"
--}}
+{{- $permsRaw := include ".chezmoitemplates/claude_allow_permissions" -}}
+{{- $perms := list -}}
+{{- range splitList "\n" $permsRaw -}}
+{{-   $trimmed := trim . -}}
+{{-   if ne $trimmed "" -}}
+{{-     $perms = append $perms $trimmed -}}
+{{-   end -}}
+{{- end -}}
 {{- if not (hasKey $data "permissions") -}}
 {{-   $data = $data | setValueAtPath "permissions" (dict "allow" list) -}}
 {{- end -}}
