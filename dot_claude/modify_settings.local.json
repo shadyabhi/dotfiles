@@ -1,0 +1,2 @@
+{{- /* chezmoi:modify-template */ -}}
+{{ fromJson .chezmoi.stdin | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") | toPrettyJson }}
