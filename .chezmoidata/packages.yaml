@@ -53,6 +53,7 @@ packages:
     - raine/claude-history/claude-history
     - ripgrep
     - rtmpdump
+    - starship
     - switchaudio-osx
     - terminal-notifier
     - tmux
