@@ -1,0 +1,4 @@
+binaries:
+  items:
+    - name: plannotator
+      install_command: curl -fsSL https://plannotator.ai/install.sh | bash
