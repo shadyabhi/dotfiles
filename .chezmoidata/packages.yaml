@@ -22,6 +22,7 @@ packages:
     - cdb
     - chezmoi
     - cloc
+    - coreutils
     - curl
     - direnv
     - displayplacer
@@ -29,6 +30,7 @@ packages:
     - flock
     - fx
     - fzf
+    - gawk
     - gemini-cli
     - gh
     - git-delta

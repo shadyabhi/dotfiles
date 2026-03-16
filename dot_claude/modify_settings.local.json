@@ -11,6 +11,7 @@
   "Bash(cd:*)"
   "Bash(npx vite:*)"
   "Bash(npm install:*)"
+  "Bash(npx vitx)"
 -}}
 {{- if not (hasKey $data "permissions") -}}
 {{-   $data = $data | setValueAtPath "permissions" (dict "allow" list) -}}
