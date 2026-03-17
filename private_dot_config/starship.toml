@@ -9,7 +9,6 @@ add_newline = false
 format = """
 ➜\
 $directory\
-${custom.giturl}\
 $git_branch\
 ${custom.git_worktree}\
 $git_status\
@@ -66,32 +65,10 @@ disabled = true
 time_format = "%R"
 format = "[[  $time ](fg:yellow bg:foam)]($style)"
 
-[custom.giturl]
-description = "Display symbol for remote Git server"
-command = """
-GIT_REMOTE=$(command git ls-remote --get-url 2> /dev/null)
-if [[ "$GIT_REMOTE" =~ "github" ]]; then
-    GIT_REMOTE_SYMBOL=" "
-elif [[ "$GIT_REMOTE" =~ "gitlab" ]]; then
-    GIT_REMOTE_SYMBOL=" "
-elif [[ "$GIT_REMOTE" =~ "bitbucket" ]]; then
-    GIT_REMOTE_SYMBOL=" "
-elif [[ "$GIT_REMOTE" =~ "git" ]]; then
-    GIT_REMOTE_SYMBOL=" "
-else
-    GIT_REMOTE_SYMBOL=" "
-fi
-echo "$GIT_REMOTE_SYMBOL "
-"""
-when = "git rev-parse --is-inside-work-tree 2> /dev/null"
-format = "$output"
-require_repo = true
-ignore_timeout = true
-
 [git_branch] 
 symbol = "[](base) "
 style = "fg:lavender bg:base"
-format =  "  [$symbol$branch]($style)[](base)"
+format =  "[$symbol$branch]($style)[](base)"
 
 # [git_status] 
 # MINIMAL git status 
