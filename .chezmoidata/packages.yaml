@@ -12,6 +12,7 @@ packages:
     - tldev/tap
   brews:
     - act
+    - agent-browser
     - ansible
     - apache-flink
     - apktool
