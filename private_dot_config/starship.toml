@@ -12,18 +12,18 @@ $directory\
 $git_branch\
 ${custom.git_worktree}\
 $git_status\
+$fill\
+$all\
 $line_break\
 $character\
 """
 
-right_format = """
-$all
-"""
+right_format = ""
 
 palette = "catppuccin_mocha"
 
-# [fill]
-# symbol = "'"
+[fill]
+symbol = " "
 
 [directory]
 style = "sapphire"
@@ -45,8 +45,8 @@ style_user = "bg:surface0 fg:text"
 style_root = "bg:surface0 fg:text"
 format = " $user "
 
-[line_break] 
-disabled = true
+[line_break]
+disabled = false
 
 [character] 
 disabled = false
