@@ -73,6 +73,7 @@
     s = log -sP
     # Show what all changed after you do a pull from remote repo
     news = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative -p HEAD@{1}..HEAD@{0}
+    pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"
     deletelocalbranch = branch -D
     deleteremotebranch = push origin --delete
 
