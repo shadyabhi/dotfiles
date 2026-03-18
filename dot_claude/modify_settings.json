@@ -7,6 +7,7 @@
 {{- end -}}
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
+{{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
 {{- $permsRaw := include ".chezmoitemplates/claude_allow_permissions" -}}
 {{- $perms := list -}}
