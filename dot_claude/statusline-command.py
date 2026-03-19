@@ -2,6 +2,9 @@
 
 import json
 import sys
+import os
+import glob
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Data extraction
@@ -20,6 +23,118 @@ ctx = input_data.get("context_window", {})
 total_input = ctx.get("total_input_tokens", 0) or 0
 total_output = ctx.get("total_output_tokens", 0) or 0
 session_cost = (total_input * 15.00 + total_output * 75.00) / 1_000_000
+
+# ---------------------------------------------------------------------------
+# Daily total cost — scan all transcript files modified today and sum tokens
+# ---------------------------------------------------------------------------
+def calc_daily_cost(current_transcript_path, current_session_cost):
+    """Return the total cost for today across all sessions."""
+    # Root projects directory — all transcripts for all projects live under here
+    projects_root = os.path.expanduser("~/.claude/projects")
+    if not os.path.isdir(projects_root):
+        return current_session_cost
+
+    today = datetime.now().date()
+    daily_total = 0.0
+    current_transcript_path = os.path.abspath(current_transcript_path) if current_transcript_path else ""
+
+    for fpath in glob.glob(os.path.join(projects_root, "**", "*.jsonl"), recursive=True):
+        fpath = os.path.abspath(fpath)
+        try:
+            mtime = os.path.getmtime(fpath)
+            if datetime.fromtimestamp(mtime).date() != today:
+                continue
+        except OSError:
+            continue
+
+        # If this is the current session, use the already-computed cost
+        if fpath == current_transcript_path:
+            daily_total += current_session_cost
+            continue
+
+        # Otherwise parse the transcript to sum token usage
+        file_input = 0
+        file_output = 0
+        try:
+            with open(fpath, "r", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    usage = None
+                    # assistant messages carry usage info
+                    if entry.get("type") == "assistant":
+                        msg = entry.get("message", {})
+                        usage = msg.get("usage")
+                    if usage:
+                        file_input += usage.get("input_tokens", 0) or 0
+                        file_output += usage.get("output_tokens", 0) or 0
+        except OSError:
+            continue
+
+        daily_total += (file_input * 15.00 + file_output * 75.00) / 1_000_000
+
+    return daily_total
+
+daily_cost = calc_daily_cost(transcript_path, session_cost)
+
+
+# ---------------------------------------------------------------------------
+# Project cost — scan ALL transcript files in the same directory as the
+# current transcript, summing their token costs (lifetime total, not just today).
+# ---------------------------------------------------------------------------
+def calc_project_cost(current_transcript_path, current_session_cost):
+    """Return the total lifetime cost for the current project (transcript directory)."""
+    if not current_transcript_path:
+        return current_session_cost
+
+    project_dir = os.path.dirname(os.path.abspath(current_transcript_path))
+    if not os.path.isdir(project_dir):
+        return current_session_cost
+
+    project_total = 0.0
+    current_transcript_path = os.path.abspath(current_transcript_path)
+
+    for fpath in glob.glob(os.path.join(project_dir, "*.jsonl")):
+        fpath = os.path.abspath(fpath)
+
+        # If this is the current session, use the already-computed cost
+        if fpath == current_transcript_path:
+            project_total += current_session_cost
+            continue
+
+        # Otherwise parse the transcript to sum token usage
+        file_input = 0
+        file_output = 0
+        try:
+            with open(fpath, "r", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    usage = None
+                    if entry.get("type") == "assistant":
+                        msg = entry.get("message", {})
+                        usage = msg.get("usage")
+                    if usage:
+                        file_input += usage.get("input_tokens", 0) or 0
+                        file_output += usage.get("output_tokens", 0) or 0
+        except OSError:
+            continue
+
+        project_total += (file_input * 15.00 + file_output * 75.00) / 1_000_000
+
+    return project_total
+
+project_cost = calc_project_cost(transcript_path, session_cost)
 
 
 # ---------------------------------------------------------------------------
@@ -101,9 +216,9 @@ if used_pct is not None:
     pct_color = block_color(filled - 1) if filled > 0 else FG_CTX_GREEN
     ctx_bar_inline = f" {blocks} {pct_color}{BOLD}{used_int}%{RESET}"
 
-# 3 (or 2 if no ctx data). Session cost segment (steel blue)
+# 3 (or 2 if no ctx data). Session | project | day cost segment (steel blue)
 cost_segment = (
-    f"{BG_SESSION}{FG_WHITE} ${session_cost:.2f} 💰 {RESET}"
+    f"{BG_SESSION}{FG_WHITE} Session: ${session_cost:.2f}  Day: ${daily_cost:.2f}  Project: ${project_cost:.2f} {RESET}"
 )
 segments.append((cost_segment, CODE_SESSION))
 
