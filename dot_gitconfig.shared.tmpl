@@ -35,46 +35,43 @@
     tool = cdiff
 
 [alias]
+    # Status & info
     st = status -s --untracked-files=no
-    # Show 'diff --cached' of current commit
-    c = commit --verbose
-    # Show 'diff' while commiting as a comment
-    ca = commit -a --verbose
-    br = branch
-    dm = diff --stat main..HEAD -p
-    co = checkout
-    d = diff
-    dmc = diff --diff-filter=U
+    s = log -sP  # search commits
+    la = "!git config -l | grep alias | cut -c 7-"  # list aliases
+    ign = ls-files -o -i --exclude-standard  # ignored files
+
+    # Staging
     a = "!f() { git add \"$@\" && git status; }; f"
-    ai = "!f() { sel=$(git ls-files --modified --others --exclude-standard | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
-    aif = "!f() { sel=$(git ls-files --modified --others --exclude-standard | grep -v '/$' | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
-    aid = "!f() { sel=$({ git diff --name-only; git ls-files --others --exclude-standard; } | sed 's|[^/]*$||' | sed 's|/$||' | sort -u | grep . | fzf --multi --preview 'git status --short -- {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status; }; f"
+    ai = "!sel=$(git ls-files --modified --others --exclude-standard | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status"  # interactive file select via fzf
+    aif = "!sel=$(git ls-files --modified --others --exclude-standard | grep -v '/$' | fzf --multi --preview 'd=$(git diff --color=always -- {} 2>/dev/null); [ -n \"$d\" ] && echo \"$d\" || cat {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status"  # interactive file select, files only
+    aid = "!sel=$({ git diff --name-only; git ls-files --others --exclude-standard; } | sed 's|[^/]*$||' | sed 's|/$||' | sort -u | grep . | fzf --multi --preview 'git status --short -- {}') && echo \"$sel\" | xargs -r git add && echo \"$sel\" && git status"  # interactive directory select
+
+    # Commit
+    c = commit --verbose
+    ca = commit -a --verbose
+
+    # Diff
+    d = diff
     dc = diff --cached
-    s = status -uno
-    # Basic
+    dm = diff --stat main..HEAD -p
+    dmc = diff --diff-filter=U  # unmerged/conflicted files
+
+    # Branch & checkout
+    br = branch
+    co = checkout
+
+    # Log
     lol = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%an]" --decorate
-    # Log with patch
-    lolp = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate -p
-    # Log with Author search
-    # Usage: $git lola Abhijeet
-    lola = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative --author
-    # Log with line changes
-    # Shows the number of line changed in different files
-    loll = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat
-    # Log with relative dates
-    # Shows time of commits as relative, for ex, 6 hours ago
-    lolr = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative
-    # Log with Graph
-    # Helps when you have branches
-    lolg = log --graph --decorate --pretty=oneline --abbrev-commit --all
-    # Show files ignored by git:
-    ign = ls-files -o -i --exclude-standard
-    la = "!git config -l | grep alias | cut -c 7-"
-    # Search for a string in commits, with patch shown
-    s = log -sP
-    # Show what all changed after you do a pull from remote repo
-    news = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative -p HEAD@{1}..HEAD@{0}
-    pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"
+    lolp = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate -p  # with patch
+    lola = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative --author  # by author
+    loll = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat  # with line counts
+    lolr = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative  # relative dates
+    lolg = log --graph --decorate --pretty=oneline --abbrev-commit --all  # graph view
+    news = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative -p HEAD@{1}..HEAD@{0}  # changes since last pull
+
+    # Push & remote
+    pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
     deletelocalbranch = branch -D
     deleteremotebranch = push origin --delete
 
