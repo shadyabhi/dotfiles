@@ -50,6 +50,7 @@
     # Commit
     c = commit --verbose
     ca = commit -a --verbose
+    ce = commit --amend
 
     # Diff
     d = diff
@@ -60,6 +61,10 @@
     # Branch & checkout
     br = branch
     co = checkout
+
+    # Rebase
+    rb = !git rebase -i $(git merge-base HEAD origin/main)
+    rc = rebase --continue
 
     # Log
     lol = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%an]" --decorate
