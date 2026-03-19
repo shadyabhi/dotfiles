@@ -32,4 +32,18 @@
 {{-     $_ := set $data.permissions "allow" (append $data.permissions.allow .) -}}
 {{-   end -}}
 {{- end -}}
+{{- /* Ensure official plugins are enabled */ -}}
+{{- $officialPlugins := list
+  "feature-dev@claude-plugins-official"
+  "gopls-lsp@claude-plugins-official"
+  "playground@claude-plugins-official"
+-}}
+{{- if not (hasKey $data "enabledPlugins") -}}
+{{-   $_ := set $data "enabledPlugins" dict -}}
+{{- end -}}
+{{- range $plugin := $officialPlugins -}}
+{{-   if not (hasKey $data.enabledPlugins $plugin) -}}
+{{-     $_ := set $data.enabledPlugins $plugin true -}}
+{{-   end -}}
+{{- end -}}
 {{ $data | toPrettyJson }}
