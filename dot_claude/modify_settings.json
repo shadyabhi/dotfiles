@@ -8,8 +8,8 @@
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
-{{- $notificationHook := dict "type" "command" "command" "terminal-notifier -title \"🔔 Claude Code\" -message \"$(basename $(pwd)): Claude needs your input\" -sender com.apple.Terminal" -}}
-{{- $stopHook := dict "type" "command" "command" "terminal-notifier -title \"✅ Claude Code\" -message \"$(basename $(pwd)): Task completed!\" -sender com.apple.Terminal" -}}
+{{- $notificationHook := dict "type" "command" "command" "bash ~/.claude/hooks/notification.sh" -}}
+{{- $stopHook := dict "type" "command" "command" "bash ~/.claude/hooks/stop.sh" -}}
 {{- $hooks := dict "Notification" (list (dict "matcher" "" "hooks" (list $notificationHook))) "Stop" (list (dict "matcher" "" "hooks" (list $stopHook))) -}}
 {{- $data = $data | setValueAtPath "hooks" $hooks -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
