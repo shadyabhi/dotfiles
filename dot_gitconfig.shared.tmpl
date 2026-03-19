@@ -75,6 +75,10 @@
     lolg = log --graph --decorate --pretty=oneline --abbrev-commit --all  # graph view
     news = log --pretty=format:"%C(yellow)%h\\ %Cblue%cd%Cred%d\\ %Creset%s%Cred\\ [%cn]" --decorate --numstat --date=relative -p HEAD@{1}..HEAD@{0}  # changes since last pull
 
+    # Search
+    searchBranchWithCommit = "!f() { pattern=\"$1\"; commit=\"$2\"; count=\"${3:-1}\"; git fetch --quiet; found=0; for branch in $(git branch -r -l \"$pattern\" --sort=-creatordate); do if git merge-base --is-ancestor \"$commit\" \"$branch\" 2>/dev/null; then echo \"$branch\"; found=$((found + 1)); if [ \"$found\" -ge \"$count\" ]; then break; fi; fi; done; if [ \"$found\" -eq 0 ]; then echo \"No matching branch found.\"; fi; }; f"
+    searchCommitWithPattern = log -sP  # search commits
+
     # Push & remote
     pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
     deletelocalbranch = branch -D
