@@ -30,14 +30,6 @@ style = "sapphire"
 format = "[ $path ]($style)"
 truncation_length = 4
 
-[directory.substitutions]
-"Documents" = "󰈙 "
-"Downloads" = " "
-"Music" = " "
-"Pictures" = " "
-"Developer" = "󰲋 "
-"Others" = " "
-
 [username]
 disabled = true
 show_always = true
