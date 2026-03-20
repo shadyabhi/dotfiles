@@ -1,1 +1,3 @@
+WORKTREE_ROOT=~/coder
+
 source <(tree-me shellenv 2>/dev/null)
