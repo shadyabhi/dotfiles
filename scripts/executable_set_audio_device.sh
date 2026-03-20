@@ -32,5 +32,8 @@ set_audio_device() {
 result_input=$(set_audio_device "input" "${PREFERRED_INPUT[@]}")
 result_output=$(set_audio_device "output" "${PREFERRED_OUTPUT[@]}")
 
+# Maximize input volume
+osascript -e "set volume input volume 100"
+
 # Send single summary notification
 osascript -e "display notification \"Preferred audio device set: Input: $result_input, Output: $result_output\" with title \"Audio Devices Set\""
