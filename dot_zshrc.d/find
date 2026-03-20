@@ -13,3 +13,18 @@ vff() {
 ff() {
     find "${2:-.}" -name "*$1*"
 }
+
+# Grep with fzf preview, open selected match at the matching line
+rgf() {
+    local selection
+    selection=$(rg --line-number --color=always "$1" "${2:-.}" | \
+        fzf --ansi \
+            --delimiter=: \
+            --preview 'bat --color=always --highlight-line {2} {1}' \
+            --preview-window='right:60%:+{2}-10')
+    if [[ -n "$selection" ]]; then
+        local file=$(echo "$selection" | cut -d: -f1)
+        local line=$(echo "$selection" | cut -d: -f2)
+        vim "+$line" "$file"
+    fi
+}
