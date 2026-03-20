@@ -5,3 +5,7 @@
 .notes
 .CodeReview
 .planning
+
+# Sensitive files
+*.crt # Not sensitive, but disable
+*.key
