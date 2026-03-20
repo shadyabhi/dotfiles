@@ -17,6 +17,7 @@ packages:
     - apache-flink
     - apktool
     - azure-cli
+    - bat
     - bitwarden-cli
     - bpython
     - buildifier
