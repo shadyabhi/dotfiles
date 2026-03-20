@@ -2,6 +2,7 @@ Bash(find)
 Bash(make run:*)
 Bash(du:*)
 Bash(cd:*)
+Bash(ls:*)
 Bash(npx vite:*)
 Bash(npm install:*)
 Bash(npx vitx)
@@ -15,8 +16,14 @@ mcp__chrome-devtools__navigate_page
 mcp__chrome-devtools__take_screenshot
 mcp__chrome-devtools__list_network_requests
 mcp__chrome-devtools__list_pages
-Bash(git show:*)
 mcp__chrome-devtools__list_console_messages
 mcp__chrome-devtools__hover
 mcp__chrome-devtools__resize_page
 mcp__chrome-devtools__get_console_message
+WebSearch
+Bash(./.go doc:*)
+Bash(./.go list:*)
+Bash(./.go build:*)
+Bash(./.go version:*)
+Bash(make test:*)
+Bash(./.go test:*)
