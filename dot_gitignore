@@ -3,6 +3,8 @@
 
 # Development
 .build
+## Mac
+.dmg
 
 # Convention to keep local files in repos
 .notes
