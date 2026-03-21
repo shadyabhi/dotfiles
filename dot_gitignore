@@ -1,6 +1,9 @@
 # Mac OS
 .DS_Store
 
+# Development
+.build
+
 # Convention to keep local files in repos
 .notes
 .CodeReview
