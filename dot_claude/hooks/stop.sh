@@ -19,6 +19,5 @@ fi
 if [[ "$FRONTMOST" != "iTerm2" || "$TMUX_VISIBLE" != "true" ]]; then
   terminal-notifier \
     -title "✅ Claude Code" \
-    -message "$BODY" \
-    -sender com.googlecode.iterm2
+    -message "$BODY" &
 fi
