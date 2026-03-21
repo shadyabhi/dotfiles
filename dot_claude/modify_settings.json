@@ -37,6 +37,7 @@
   "feature-dev@claude-plugins-official"
   "gopls-lsp@claude-plugins-official"
   "playground@claude-plugins-official"
+  "swift-lsp@claude-plugins-official"
 -}}
 {{- if not (hasKey $data "enabledPlugins") -}}
 {{-   $_ := set $data "enabledPlugins" dict -}}
