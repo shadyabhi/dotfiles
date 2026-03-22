@@ -26,6 +26,7 @@ packages:
     - cloc
     - coreutils
     - curl
+    - diffnav
     - direnv
     - displayplacer
     - ffmpeg
