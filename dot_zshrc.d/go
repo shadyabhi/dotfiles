@@ -1,3 +1,5 @@
-export GOROOT=/usr/local/go
+# brew --prefix go
+export GOROOT=/opt/homebrew/opt/go/libexec
+
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
