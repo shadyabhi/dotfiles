@@ -127,45 +127,34 @@ Redhat = "󱄛"
 RedHatEnterprise = "󱄛"
 
 [nodejs]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [c]
-symbol = " "
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [rust]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [golang]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
-detect_files = ["go.mod"]
+disabled = true
 
 [php]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [java]
-symbol = " "
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [kotlin]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [haskell]
-symbol = ""
-format = "[ $symbol( $version) ]($style)"
+disabled = true
 
 [python]
-symbol = ""
-format = "[ $symbol( $version) ]($style)" 
+disabled = true
 
 [docker_context]
-symbol = ""
-format = "[ $symbol( $context) ]($style)"
+disabled = true
 
 [palettes.catppuccin_mocha]
 # --- background ---
