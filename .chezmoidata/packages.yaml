@@ -10,6 +10,7 @@ packages:
     - krishkrosh/apps
     - shadyabhi/tap
     - tldev/tap
+    - jazzyalex/agent-sessions
   brews:
     - act
     - agent-browser
@@ -77,6 +78,7 @@ packages:
     - rust
   work_brews: []
   casks:
+    - agent-sessions
     - alfred
     - android-platform-tools
     - android-studio
