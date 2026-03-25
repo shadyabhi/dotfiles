@@ -1,6 +1,7 @@
 #!/bin/zsh
 
 LUMESENT=/Applications/Lumesent.app/Contents/MacOS/Lumesent
+GDATE=/opt/homebrew/opt/coreutils/libexec/gnubin/date
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 
 # If first arg looks like a duration (e.g. 5s, 10m, 2h), delay the notification via launchd
@@ -15,16 +16,23 @@ if [[ "$1" =~ ^([0-9]+)([smh])$ ]]; then
     h) seconds=$((num * 3600)) ;;
   esac
 
-  fire_date=$(date -d "+${seconds} seconds" '+%Y-%m-%dT%H:%M:%S')
-  fire_month=$(date -d "+${seconds} seconds" '+%-m')
-  fire_day=$(date -d "+${seconds} seconds" '+%-d')
-  fire_hour=$(date -d "+${seconds} seconds" '+%-H')
-  fire_minute=$(date -d "+${seconds} seconds" '+%-M')
-  job_id="com.lumesent.notify.$(date +%s).$$"
-  plist="$LAUNCH_AGENTS/${job_id}.plist"
-
   title="$1"
   body="${*:2}"
+
+  # For short delays (under 60s), use sleep directly — launchd only has minute granularity
+  if (( seconds < 60 )); then
+    ( sleep "$seconds" && $LUMESENT send --title "$title" --body "$body" ) &
+    echo "Notification scheduled in $delay (via background sleep)"
+    exit 0
+  fi
+
+  fire_date=$($GDATE -d "+${seconds} seconds" '+%Y-%m-%dT%H:%M:%S')
+  fire_month=$($GDATE -d "+${seconds} seconds" '+%-m')
+  fire_day=$($GDATE -d "+${seconds} seconds" '+%-d')
+  fire_hour=$($GDATE -d "+${seconds} seconds" '+%-H')
+  fire_minute=$($GDATE -d "+${seconds} seconds" '+%-M')
+  job_id="com.lumesent.notify.$($GDATE +%s).$$"
+  plist="$LAUNCH_AGENTS/${job_id}.plist"
 
   cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
