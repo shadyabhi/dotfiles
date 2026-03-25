@@ -15,4 +15,7 @@ bindkey -M isearch " " magic-space # normal space during searches
 alias p3="python3"
 alias md="open -a MarkEdit" 
 alias cm="chezmoi"
+
+# Global
 alias -g CCR="claude --resume"
+alias -g G="| grep "
