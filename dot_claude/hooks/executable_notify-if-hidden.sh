@@ -14,5 +14,5 @@ if [[ "$FRONTMOST" == "iTerm2" && "$PANE_ACTIVE" == "1" && "$WINDOW_ACTIVE" == "
   /usr/bin/logger -t "$TAG" "$SCRIPT_NAME: skipped (iTerm2 focused, tmux pane visible)"
 else
   /usr/bin/logger -t "$TAG" "$SCRIPT_NAME: sending: $BODY"
-  terminal-notifier -title "$TITLE" -message "$BODY" -group "$GROUP" &
+  /Applications/Lumesent.app/Contents/MacOS/Lumesent send --title "$TITLE" --body "$BODY" &
 fi
