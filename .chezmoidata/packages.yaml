@@ -11,6 +11,7 @@ packages:
     - shadyabhi/tap
     - tldev/tap
     - jazzyalex/agent-sessions
+    - GrowlyX/instantgrep
   brews:
     - act
     - agent-browser
@@ -43,6 +44,7 @@ packages:
     - gyb
     - haproxy
     - hurl
+    - instantgrep
     - jj
     - jq
     - libusb
