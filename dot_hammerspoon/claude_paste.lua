@@ -11,29 +11,72 @@ local terminalApps = {
 }
 
 local function clipboardHasImage()
-    local types = hs.pasteboard.typesAvailable()
+    local ok, types = pcall(hs.pasteboard.typesAvailable)
+    if not ok or not types then return false end
     return types.image
 end
 
 local function isFocusedTerminal()
-    local app = hs.application.frontmostApplication()
-    if not app then return false end
-    return terminalApps[app:bundleID()] or false
+    local ok, app = pcall(hs.application.frontmostApplication)
+    if not ok or not app then return false end
+    local ok2, bid = pcall(function() return app:bundleID() end)
+    if not ok2 or not bid then return false end
+    return terminalApps[bid] or false
 end
 
-local cmdvTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-    local flags = event:getFlags()
-    local keyCode = event:getKeyCode()
+-- Track whether we remapped the last keyDown so we can suppress the matching keyUp
+local suppressNextKeyUp = false
 
-    -- Cmd+V (keyCode 9 = 'v')
-    if keyCode == 9 and flags.cmd and not flags.ctrl and not flags.alt and not flags.shift then
-        if isFocusedTerminal() and clipboardHasImage() then
-            -- Send Ctrl+V instead
-            hs.eventtap.keyStroke({ "ctrl" }, "v", 0)
-            return true -- suppress original Cmd+V
+local cmdvTap = hs.eventtap.new(
+    { hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp },
+    function(event)
+        local ok, result, events = pcall(function()
+            local flags = event:getFlags()
+            local keyCode = event:getKeyCode()
+            local eventType = event:getType()
+
+            if keyCode ~= 9 then return false end -- only care about 'v'
+
+            -- Handle keyUp: suppress the orphaned V key-up from the original Cmd+V
+            if eventType == hs.eventtap.event.types.keyUp then
+                if suppressNextKeyUp then
+                    suppressNextKeyUp = false
+                    return true -- suppress it
+                end
+                return false
+            end
+
+            -- Handle keyDown: Cmd+V (keyCode 9 = 'v')
+            if flags.cmd and not flags.ctrl and not flags.alt and not flags.shift then
+                if isFocusedTerminal() and clipboardHasImage() then
+                    suppressNextKeyUp = true
+                    -- Replace with Ctrl+V down+up, explicit flags to override physical Cmd
+                    local ctrlDown = hs.eventtap.event.newKeyEvent({"ctrl"}, "v", true)
+                    local ctrlUp   = hs.eventtap.event.newKeyEvent({"ctrl"}, "v", false)
+                    ctrlDown:setFlags({ ctrl = true })
+                    ctrlUp:setFlags({ ctrl = true })
+                    return true, { ctrlDown, ctrlUp }
+                end
+            end
+            return false
+        end)
+
+        if ok then
+            return result, events
+        else
+            print("[claude_paste] eventtap callback error: " .. tostring(result))
+            return false
         end
     end
-    return false
-end)
+)
 
 cmdvTap:start()
+
+-- Watchdog: restart the eventtap if it stops running
+local watchdog = hs.timer.new(5, function()
+    if not cmdvTap:isEnabled() then
+        print("[claude_paste] eventtap died, restarting")
+        cmdvTap:start()
+    end
+end)
+watchdog:start()
