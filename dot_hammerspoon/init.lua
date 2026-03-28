@@ -6,6 +6,7 @@ require "win/grid"
 require "win/switch"
 require "win/spaces"
 require "win/auto_close"
+require "win/fullscreen_notify"
 require "audio_watcher"
 require "selectcopy"
 require "claude_paste"
@@ -20,4 +21,4 @@ spoon.SpoonInstall:andUse("ReloadConfiguration", { start = true })
 -- Enable Apple Script support
 hs.allowAppleScript(true)
 
-hs.alert.show("Hammerspoon reload finished successfully!")
+require("notify").info("Hammerspoon", "Reload finished successfully!")

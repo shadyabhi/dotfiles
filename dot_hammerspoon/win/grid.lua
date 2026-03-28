@@ -187,7 +187,7 @@ hs_bind("g", function()
     local windows = hs.window.filter.defaultCurrentSpace:getWindows()
     local nGrid = math.ceil(math.sqrt(#windows))
 
-    hs.alert.show("Found " .. #windows .. " windows, switching to " .. nGrid .. "x" .. nGrid .. " grid")
+    require("notify").info("Grid", "Found " .. #windows .. " windows, switching to " .. nGrid .. "x" .. nGrid .. " grid")
 
     hs.grid.setGrid(nGrid .. "x" .. nGrid)
     drawGrid(hs.grid.getGrid(), hs.window.filter.defaultCurrentSpace:getWindows())

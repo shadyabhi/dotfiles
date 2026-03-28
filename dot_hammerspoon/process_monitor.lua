@@ -11,20 +11,15 @@ local INTERVAL = 5 -- seconds
 local timer = nil
 local currentTask = nil
 
+local notify = require("notify")
+
 local function check()
     currentTask = hs.task.new("/usr/bin/python3", function(exitCode, stdout, stderr)
         currentTask = nil
         if stdout then
             local trimmed = stdout:gsub("%s+$", "")
             if trimmed ~= "" then
-                hs.alert.show(trimmed, {
-                    strokeColor = { white = 0, alpha = 0 },
-                    fillColor = { red = 0.7, green = 0.1, blue = 0.1, alpha = 0.9 },
-                    textColor = { white = 1, alpha = 1 },
-                    textFont = ".AppleSystemUIFont",
-                    textSize = 16,
-                    radius = 10,
-                }, 5)
+                notify.alert("Process Monitor", trimmed, 5)
             end
         end
     end, {SCRIPT})
