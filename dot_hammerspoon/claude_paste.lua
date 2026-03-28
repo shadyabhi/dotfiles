@@ -72,11 +72,25 @@ local cmdvTap = hs.eventtap.new(
 
 cmdvTap:start()
 
--- Watchdog: restart the eventtap if it stops running
-local watchdog = hs.timer.new(5, function()
-    if not cmdvTap:isEnabled() then
-        print("[claude_paste] eventtap died, restarting")
-        cmdvTap:start()
-    end
+-- Force-restart the eventtap to recover from zombie state (enabled but not receiving events)
+local function restartTap(reason)
+    print("[claude_paste] restarting eventtap: " .. reason)
+    cmdvTap:stop()
+    cmdvTap:start()
+end
+
+-- Periodically force-restart to recover from zombie taps (isEnabled stays true but events stop)
+local watchdog = hs.timer.new(30, function()
+    restartTap("periodic refresh")
 end)
 watchdog:start()
+
+-- Also restart on wake from sleep, which commonly kills eventtaps
+local caffeinateWatcher = hs.caffeinate.watcher.new(function(event)
+    if event == hs.caffeinate.watcher.systemDidWake then
+        hs.timer.doAfter(2, function()
+            restartTap("wake from sleep")
+        end)
+    end
+end)
+caffeinateWatcher:start()
