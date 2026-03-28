@@ -9,6 +9,7 @@ require "win/auto_close"
 require "audio_watcher"
 require "selectcopy"
 require "claude_paste"
+require "process_monitor"
 require "hs.ipc"
 
 -- Auto-install and load spoons
