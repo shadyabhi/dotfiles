@@ -14,12 +14,10 @@ local fadeTimer = nil
 
 local themes = {
     info = {
-        fill   = {red = 0.3, green = 0.75, blue = 0.35, alpha = 0.92},
-        stroke = {red = 0.4, green = 0.85, blue = 0.45, alpha = 0.5},
+        accent = {red = 0.3, green = 0.75, blue = 0.35, alpha = 1},
     },
     alert = {
-        fill   = {red = 0.85, green = 0.25, blue = 0.25, alpha = 0.92},
-        stroke = {red = 0.95, green = 0.4, blue = 0.4, alpha = 0.5},
+        accent = {red = 0.85, green = 0.25, blue = 0.25, alpha = 1},
     },
 }
 
@@ -30,26 +28,33 @@ local function show(level, title, subtitle, duration)
     if canvas then canvas:delete(); canvas = nil end
 
     local theme = themes[level] or themes.info
-    duration = duration or 0.8
+    duration = duration or 1.5
+
+    -- Dark macOS notification style
+    local bgColor     = {red = 0.12, green = 0.12, blue = 0.14, alpha = 0.95}
+    local strokeColor  = {red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6}
+    local titleColor   = {white = 1, alpha = 0.95}
+    local subColor     = {white = 1, alpha = 0.55}
 
     -- Style constants
-    local pad = 16
+    local pad = 14
     local gap = 12
-    local titleFont = {name = hs.styledtext.defaultFonts.boldSystem, size = 18}
-    local subFont   = {name = hs.styledtext.defaultFonts.boldSystem, size = 14}
+    local iconSize = 36
+    local cornerRadius = 14
+    local titleFont = {name = hs.styledtext.defaultFonts.boldSystem, size = 15}
+    local subFont   = {name = hs.styledtext.defaultFonts.system, size = 13}
 
-    local styledTitle = hs.styledtext.new(title or "", {font = titleFont, color = {white = 0, alpha = 0.9}})
+    local styledTitle = hs.styledtext.new(title or "", {font = titleFont, color = titleColor})
     local titleDims = hs.drawing.getTextDrawingSize(styledTitle)
 
     local styledSub, subDims
     if subtitle and subtitle ~= "" then
-        styledSub = hs.styledtext.new(subtitle, {font = subFont, color = {white = 0, alpha = 0.6}})
+        styledSub = hs.styledtext.new(subtitle, {font = subFont, color = subColor})
         subDims = hs.drawing.getTextDrawingSize(styledSub)
     end
 
-    -- Optionally show app icon if the focused window's app matches
+    -- App icon from focused window
     local iconImage = nil
-    local iconSize = 40
     local focusedWin = hs.window.focusedWindow()
     if focusedWin and focusedWin:application() then
         iconImage = hs.image.imageFromAppBundle(focusedWin:application():bundleID())
@@ -58,11 +63,11 @@ local function show(level, title, subtitle, duration)
     local hasIcon = iconImage ~= nil
     local textW = titleDims.w
     if subDims then textW = math.max(textW, subDims.w) end
-    local maxTextW = 400
+    local maxTextW = 350
     if textW > maxTextW then textW = maxTextW end
 
     local contentH = titleDims.h
-    if subDims then contentH = contentH + 2 + subDims.h end
+    if subDims then contentH = contentH + 3 + subDims.h end
 
     local totalW, totalH
     if hasIcon then
@@ -73,41 +78,55 @@ local function show(level, title, subtitle, duration)
         totalH = pad + contentH + pad
     end
 
+    -- Min width for a clean look
+    if totalW < 220 then totalW = 220 end
+
     -- Position: top-center of the focused screen
     local screen = hs.screen.mainScreen():frame()
     local x = screen.x + (screen.w - totalW) / 2
-    local y = screen.y + 10
+    local y = screen.y + 53
 
     canvas = hs.canvas.new({x = x, y = y, w = totalW, h = totalH})
 
     -- Background
     canvas[1] = {
         type = "rectangle",
-        roundedRectRadii = {xRadius = 10, yRadius = 10},
-        fillColor = theme.fill,
-        strokeColor = theme.stroke,
+        roundedRectRadii = {xRadius = cornerRadius, yRadius = cornerRadius},
+        fillColor = bgColor,
+        strokeColor = strokeColor,
         strokeWidth = 0.5,
     }
 
-    local nextIdx = 2
+    -- Accent bar on left edge
+    canvas[2] = {
+        type = "rectangle",
+        frame = {x = 0, y = 6, w = 3, h = totalH - 12},
+        roundedRectRadii = {xRadius = 1.5, yRadius = 1.5},
+        fillColor = theme.accent,
+        strokeWidth = 0,
+    }
+
+    local nextIdx = 3
     local textX = pad
 
-    -- App icon (if available)
+    -- App icon
     if hasIcon then
         canvas[nextIdx] = {
             type = "image",
             image = iconImage,
             frame = {x = pad, y = (totalH - iconSize) / 2, w = iconSize, h = iconSize},
+            imageScaling = "scaleProportionally",
         }
         nextIdx = nextIdx + 1
         textX = pad + iconSize + gap
     end
 
     -- Title
+    local textY = hasIcon and (totalH - contentH) / 2 or pad
     canvas[nextIdx] = {
         type = "text",
         text = styledTitle,
-        frame = {x = textX, y = pad, w = textW, h = titleDims.h},
+        frame = {x = textX, y = textY, w = textW, h = titleDims.h},
     }
     nextIdx = nextIdx + 1
 
@@ -116,15 +135,27 @@ local function show(level, title, subtitle, duration)
         canvas[nextIdx] = {
             type = "text",
             text = styledSub,
-            frame = {x = textX, y = pad + titleDims.h + 2, w = textW, h = subDims.h},
+            frame = {x = textX, y = textY + titleDims.h + 3, w = textW, h = subDims.h},
         }
     end
 
     canvas:level("overlay")
-    canvas:alpha(1)
+    canvas:alpha(0)
     canvas:show()
 
-    -- Fade out
+    -- Fade in
+    local fadeInTimer
+    fadeInTimer = hs.timer.doEvery(0.015, function()
+        local a = canvas:alpha()
+        if a >= 0.95 then
+            canvas:alpha(1)
+            fadeInTimer:stop()
+        else
+            canvas:alpha(a + 0.12)
+        end
+    end)
+
+    -- Fade out after duration
     timer = hs.timer.doAfter(duration, function()
         fadeTimer = hs.timer.doEvery(0.02, function()
             local a = canvas:alpha()
@@ -132,7 +163,7 @@ local function show(level, title, subtitle, duration)
                 fadeTimer:stop(); fadeTimer = nil
                 canvas:delete(); canvas = nil
             else
-                canvas:alpha(a - 0.08)
+                canvas:alpha(a - 0.06)
             end
         end)
     end)
