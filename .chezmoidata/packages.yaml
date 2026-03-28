@@ -96,6 +96,7 @@ packages:
     - font-fira-code-nerd-font
     - font-hack-nerd-font
     - hammerspoon
+    - hiddenbar
     - intellij-idea
     - markedit
     - obsidian
