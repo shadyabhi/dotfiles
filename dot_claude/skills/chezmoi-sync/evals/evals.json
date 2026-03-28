@@ -1,0 +1,23 @@
+{
+  "skill_name": "chezmoi-sync",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just edited ~/.config/starship.toml to change my prompt theme. Sync to chezmoi.",
+      "expected_output": "Runs chezmoi add on starship.toml, commits with a descriptive message about the prompt theme change, and pushes.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I edited .gitconfig and .bashrc today. Chezmoi sync please.",
+      "expected_output": "Runs chezmoi add on both files, commits with a message mentioning both config changes, and pushes.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Save my dotfile changes",
+      "expected_output": "Identifies edited files from conversation context, runs chezmoi add, commits with descriptive message, and pushes.",
+      "files": []
+    }
+  ]
+}
