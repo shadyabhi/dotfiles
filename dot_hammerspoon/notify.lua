@@ -84,7 +84,7 @@ local function show(level, title, subtitle, duration)
     -- Position: top-center of the focused screen
     local screen = hs.screen.mainScreen():frame()
     local x = screen.x + (screen.w - totalW) / 2
-    local y = screen.y + 53
+    local y = screen.y + math.floor((screen.h - totalH) / 2)
 
     canvas = hs.canvas.new({x = x, y = y, w = totalW, h = totalH})
 
