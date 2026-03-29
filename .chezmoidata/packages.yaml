@@ -41,6 +41,7 @@ packages:
     - gh
     - git-delta
     - gnu-sed
+    - golang
     - goreleaser
     - gyb
     - haproxy
