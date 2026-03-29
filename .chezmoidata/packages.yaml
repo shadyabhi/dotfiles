@@ -21,6 +21,7 @@ packages:
     - azure-cli
     - bat
     - bitwarden-cli
+    - blueutil
     - bpython
     - buildifier
     - cdb
