@@ -10,3 +10,7 @@ defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeF
 # Applications
 defaults write com.apple.LaunchServices LSQuarantine -bool false && echo "✅️ Apps: Disable quarantine dialog for new apps"
 defaults write -g NSNavPanelExpandedStateForSaveMode -bool true && echo "✅️ Apps: Always show expanded save dialog"
+
+# Soft links
+sudo ln -s ~/Library/Mobile\ Documents/com\~apple\~CloudDocs ~/iCloud
+sudo ln -s $HOME /Users/home

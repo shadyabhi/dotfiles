@@ -1,0 +1,2 @@
+# When default folder is read-only
+export ANSIBLE_REMOTE_TMP=/var/tmp/ansible
