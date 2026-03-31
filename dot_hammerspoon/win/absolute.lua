@@ -2,17 +2,8 @@ local logger = hs.logger.new('win_absolute','info')
 local Mouse = require("mouse")
 local notify = require("notify")
 
--- Notifications every time a window is changed (helpful for tiling window manager)
-hs.window.filter.default:subscribe(hs.window.filter.windowFocused, function(window, appName)
-    local app = window:application()
-    local appTitle = app and app:title() or ""
-    local winTitle = window:title() or ""
-    notify.info(appTitle, winTitle, 0.2)
-end)
-
 -- vars for window management
 hs.window.animationDuration=0
-
 
 -- Resize window for chunk of screen.
 -- For x and y: use 0 to expand fully in that dimension, 0.5 to expand halfway
