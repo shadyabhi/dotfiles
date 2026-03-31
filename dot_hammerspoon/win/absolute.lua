@@ -7,7 +7,7 @@ hs.window.filter.default:subscribe(hs.window.filter.windowFocused, function(wind
     local app = window:application()
     local appTitle = app and app:title() or ""
     local winTitle = window:title() or ""
-    notify.info(appTitle, winTitle)
+    notify.info(appTitle, winTitle, 0.2)
 end)
 
 -- vars for window management
