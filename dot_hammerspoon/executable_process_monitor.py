@@ -7,7 +7,8 @@ import subprocess
 REQUIRED_APPS = [
     "Lumesent",
     "Shottr",
-    "BetterDisplay"
+    "BetterDisplay",
+    "MacWhisper"
 ]
 
 
