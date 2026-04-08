@@ -1,3 +1,4 @@
 pipx:
   items:
     - name: notebooklm-cli
+    - name: graphifyy
