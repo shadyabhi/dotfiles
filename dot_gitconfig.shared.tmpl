@@ -69,7 +69,7 @@
     pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
 
     # Rebase
-    rb = !git rebase -i $(git merge-base HEAD origin/main)
+    squash = !git rebase -i $(git merge-base HEAD origin/main)
     rc = rebase --continue
 
     # Log
