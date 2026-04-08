@@ -66,7 +66,7 @@
     deletelocalbranch = branch -D
     deleteremotebranch = push origin --delete
 
-    pushf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
+    pf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
 
     # Rebase
     squash = !git rebase -i $(git merge-base HEAD origin/main)
