@@ -1,0 +1,12 @@
+#!/bin/sh
+
+{{ (bitwarden "item" "chezmoi_cf_device_tracker").notes }}
+
+set -eu
+
+tracker_base_url="${CF_DEVICE_TRACKER_URL%/}"
+authorization_header="Authorization: Bearer $AUTH_KEY"
+device_name="$(system_profiler SPHardwareDataType | awk '/Serial Number/{print $NF}')-$(scutil --get LocalHostName)"
+
+curl -fsS -H "$authorization_header" -H "Content-Type: application/json" \
+  -d "{\"device\":\"$device_name\"}" "$tracker_base_url/register"
