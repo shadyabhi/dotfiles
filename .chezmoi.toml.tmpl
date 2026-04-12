@@ -1,7 +1,7 @@
 {{- $device_type_choices := list "personal" "work" -}}
 {{- $device_type := promptChoice "What type of device?" $device_type_choices -}}
-
-{{ $email := promptString "email" -}}
+{{- $git_user_name := promptStringOnce . "git_user_name" "Full name for git (user.name)" -}}
+{{- $email := promptStringOnce . "email" "Email for git" -}}
 
 [git]
     autoCommit = false
@@ -10,4 +10,5 @@
 
 [data]
     device_type = {{ $device_type | quote }}
+    git_user_name = {{ $git_user_name | quote }}
     email = {{ $email | quote }}
