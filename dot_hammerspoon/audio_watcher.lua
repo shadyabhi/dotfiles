@@ -3,7 +3,7 @@ local log = hs.logger.new("audio_watcher", "info")
 local function runSetAudioDevice()
   -- add a delay to allow the system to fully switch devices
   hs.timer.doAfter(2, function()
-    hs.execute("~/scripts/set_audio_device.sh")
+    hs.execute("~/scripts/macos/set_audio_device.sh")
     log.i("Script executed and notification sent")
   end)
 end
