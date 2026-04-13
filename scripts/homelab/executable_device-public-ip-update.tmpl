@@ -11,5 +11,4 @@ device_name="$(system_profiler SPHardwareDataType | awk '/Serial Number/{print $
 curl -4 -fsS -H "$authorization_header" -H "Content-Type: application/json" \
   -d "{\"device\":\"$device_name\"}" "$tracker_base_url/register" | jq
 
-curl -4 -fsS -H "$authorization_header" -H "Content-Type: application/json" \
-  -d "{\"device\":\"$device_name\"}" "$tracker_base_url/list" | jq
+curl -4 -fsS -H "$authorization_header" -H "Content-Type: application/json" "$tracker_base_url/list" | jq
