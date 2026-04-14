@@ -8,6 +8,7 @@
 {{- $data = $data | setValueAtPath "outputStyle" "default" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
+{{- $data = $data | setValueAtPath "includeCoAuthoredBy" false -}}
 {{- $notificationHook := dict "type" "command" "command" "bash ~/.claude/hooks/notification.sh" -}}
 {{- $stopHook := dict "type" "command" "command" "bash ~/.claude/hooks/stop.sh" -}}
 {{- $hooks := dict "Notification" (list (dict "matcher" "" "hooks" (list $notificationHook))) "Stop" (list (dict "matcher" "" "hooks" (list $stopHook))) -}}
