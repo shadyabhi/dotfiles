@@ -11,8 +11,32 @@ hs.grid.setGrid('3x2')
 hs.grid.setMargins('1x1')
 
 -- Shortcuts: move windows between grids
-h_bind("right", hs.grid.pushWindowRight)
-h_bind("left", hs.grid.pushWindowLeft)
+-- On single screen at grid edge, move to next/prev space instead of wrapping
+h_bind("right", function()
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    if #hs.screen.allScreens() == 1 then
+        local g = hs.grid.get(win)
+        local sg = hs.grid.getGrid(win:screen())
+        if g.x + g.w >= sg.w then
+            moveWindowOneSpace("right", true)
+            return
+        end
+    end
+    hs.grid.pushWindowRight()
+end)
+h_bind("left", function()
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    if #hs.screen.allScreens() == 1 then
+        local g = hs.grid.get(win)
+        if g.x <= 0 then
+            moveWindowOneSpace("left", true)
+            return
+        end
+    end
+    hs.grid.pushWindowLeft()
+end)
 h_bind("down", hs.grid.pushWindowDown)
 h_bind("up", hs.grid.pushWindowUp)
 
