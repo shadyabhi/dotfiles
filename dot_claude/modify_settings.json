@@ -9,9 +9,21 @@
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
 {{- $data = $data | setValueAtPath "includeCoAuthoredBy" false -}}
+{{- /* --- Hooks ---------------------------------------------------------- */ -}}
 {{- $notificationHook := dict "type" "command" "command" "bash ~/.claude/hooks/notification.sh" -}}
+{{- $notificationGroup := list (dict "matcher" "" "hooks" (list $notificationHook)) -}}
+
+{{- $permAuditHook := dict "type" "command" "command" "python3 ~/.claude/hooks/permission-audit.py" "timeout" 5 -}}
+{{- $preToolUseGroup := list (dict "matcher" "" "hooks" (list $permAuditHook)) -}}
+
 {{- $stopHook := dict "type" "command" "command" "bash ~/.claude/hooks/stop.sh" -}}
-{{- $hooks := dict "Notification" (list (dict "matcher" "" "hooks" (list $notificationHook))) "Stop" (list (dict "matcher" "" "hooks" (list $stopHook))) -}}
+{{- $stopGroup := list (dict "matcher" "" "hooks" (list $stopHook)) -}}
+
+{{- $hooks := dict
+      "Notification" $notificationGroup
+      "PreToolUse"   $preToolUseGroup
+      "Stop"         $stopGroup
+-}}
 {{- $data = $data | setValueAtPath "hooks" $hooks -}}
 {{- $data = $data | setValueAtPath "statusLine" (dict "type" "command" "command" "python3 ~/.claude/statusline-command.py") -}}
 {{- $permsRaw := include ".chezmoitemplates/claude_allow_permissions" -}}
