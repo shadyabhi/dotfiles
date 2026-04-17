@@ -74,6 +74,7 @@ local function launchApp(name)
 end
 
 -- Shortcuts
+h_bind("j", launchApp("Emdash Beta"))
 h_bind("b", launchApp("Google Chrome"))
 h_bind("c", launchApp("Google Calendar"))
 h_bind("e", launchApp("Microsoft Edge"))
