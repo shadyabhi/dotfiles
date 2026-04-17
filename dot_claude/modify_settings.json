@@ -9,6 +9,7 @@
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
 {{- $data = $data | setValueAtPath "includeCoAuthoredBy" false -}}
+{{- $data = $data | setValueAtPath "CLAUDE_CODE_NO_FLICKER" 1 -}}
 {{- /* --- Hooks ---------------------------------------------------------- */ -}}
 {{- $notificationHook := dict "type" "command" "command" "bash ~/.claude/hooks/notification.sh" -}}
 {{- $notificationGroup := list (dict "matcher" "" "hooks" (list $notificationHook)) -}}
