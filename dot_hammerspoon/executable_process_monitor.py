@@ -8,7 +8,8 @@ REQUIRED_APPS = [
     "Lumesent",
     "Shottr",
     "BetterDisplay",
-    "MacWhisper"
+    "MacWhisper",
+    "Alfred"
 ]
 
 
