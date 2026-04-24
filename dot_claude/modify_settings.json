@@ -1,5 +1,9 @@
 {{- /* chezmoi:modify-template */ -}}
-{{- $data := fromJson .chezmoi.stdin -}}
+{{- $current := "{}" -}}
+{{- if and (hasKey .chezmoi "stdin") .chezmoi.stdin -}}
+{{-   $current = .chezmoi.stdin -}}
+{{- end -}}
+{{- $data := fromJson $current -}}
 {{- if eq .chezmoi.config.data.device_type "work" -}}
 {{-   $data = $data | setValueAtPath "model" "opus[1m]" -}}
 {{- else -}}
