@@ -11,6 +11,7 @@ require "audio_watcher"
 require "selectcopy"
 require "claude_paste"
 require "process_monitor"
+require "claude_sessions"
 require "hs.ipc"
 
 -- Auto-install and load spoons
