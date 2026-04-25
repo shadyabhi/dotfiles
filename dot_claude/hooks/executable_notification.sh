@@ -21,9 +21,23 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 MESSAGE=$(echo "$INPUT" | jq -r '.message // empty')
 NOTIF_TYPE=$(echo "$INPUT" | jq -r '.notification_type // empty')
 
+LOG_DIR="$HOME/.claude/logs"
+LOG_FILE="$LOG_DIR/notifications.log"
+mkdir -p "$LOG_DIR"
+{
+  echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+  echo "PROJECT=$PROJECT"
+  echo "SESSION_ID=$SESSION_ID"
+  echo "MESSAGE=$MESSAGE"
+  echo "NOTIF_TYPE=$NOTIF_TYPE"
+  echo "CURSOR_VERSION=$CURSOR_VERSION"
+  echo "RAW=$INPUT"
+  echo ""
+} >> "$LOG_FILE"
+
 # Suppressed message patterns (one per line, matched as substrings)
 SUPPRESSED_PATTERNS=(
-  "Claude is waiting for your input",
+  "Claude is waiting for your input"
   "claude-rename-worker"
 )
 
