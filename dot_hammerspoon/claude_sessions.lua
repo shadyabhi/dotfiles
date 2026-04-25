@@ -1,6 +1,7 @@
 local M = {}
 
-local INTERVAL = 2
+local INTERVAL = 1
+local FETCH_TIMEOUT = 5  -- seconds; kill menubar.py if it hangs
 local HOME = os.getenv("HOME")
 local UID = hs.execute("id -u 2>/dev/null"):gsub("%s+", "")
 
@@ -13,15 +14,17 @@ local BANNER_MARGIN = 8
 
 local MENUBAR_PY = HOME .. "/scripts/claude/menubar.py"
 
-local function fetch_summary()
-    local out = hs.execute(MENUBAR_PY .. " 2>/dev/null") or ""
-    local ok, data = pcall(hs.json.decode, out)
+local in_flight = nil       -- hs.task currently running, or nil
+local in_flight_started = 0 -- epoch seconds when current task started
+
+local function parse_and_apply(out, on_data)
+    local ok, data = pcall(hs.json.decode, out or "")
     if not ok or type(data) ~= "table" then
-        return { summary = "", details = {} }
+        data = { summary = "", details = {} }
     end
     data.details = data.details or {}
     data.summary = data.summary or ""
-    return data
+    on_data(data)
 end
 
 local bar = hs.menubar.new()
@@ -125,8 +128,7 @@ local function update_banner(waiting_sessions)
     banner:show()
 end
 
-local function refresh()
-    local data = fetch_summary()
+local function apply_data(data)
     local sessions = data.details
 
     local waiting = 0
@@ -171,6 +173,25 @@ local function refresh()
     end
 
     bar:setMenu(menu)
+end
+
+local function refresh()
+    -- If a previous task is still running, check timeout and skip this tick.
+    if in_flight then
+        if hs.timer.secondsSinceEpoch() - in_flight_started > FETCH_TIMEOUT then
+            pcall(function() in_flight:terminate() end)
+            in_flight = nil
+        else
+            return
+        end
+    end
+
+    in_flight_started = hs.timer.secondsSinceEpoch()
+    in_flight = hs.task.new(MENUBAR_PY, function(_, stdout, _)
+        in_flight = nil
+        parse_and_apply(stdout, apply_data)
+    end)
+    in_flight:start()
 end
 
 local timer = hs.timer.doEvery(INTERVAL, refresh)
