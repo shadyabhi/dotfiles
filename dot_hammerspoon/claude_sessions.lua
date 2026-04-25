@@ -14,6 +14,19 @@ local BANNER_MARGIN = 8
 
 local MENUBAR_PY = HOME .. "/scripts/claude/menubar.py"
 
+-- Clean up any prior instance (Hammerspoon reload leaks closures otherwise)
+if _G._claude_sessions_state then
+    local s = _G._claude_sessions_state
+    if s.timer then s.timer:stop() end
+    if s.blink_timer then s.blink_timer:stop() end
+    if s.in_flight then pcall(function() s.in_flight:terminate() end) end
+    if s.bar then s.bar:delete() end
+    if s.banner then s.banner:delete() end
+    if s.hotkey then s.hotkey:delete() end
+end
+local state = {}
+_G._claude_sessions_state = state
+
 local in_flight = nil       -- hs.task currently running, or nil
 local in_flight_started = 0 -- epoch seconds when current task started
 
@@ -29,6 +42,8 @@ end
 
 local bar = hs.menubar.new()
 bar:setTitle("…")
+state.bar = bar
+bar:setClickCallback(function() if state.show_chooser then state.show_chooser() end end)
 
 local banner        = nil
 local banner_key    = ""  -- tracks last rendered state to avoid needless redraws
@@ -36,6 +51,7 @@ local banner_key    = ""  -- tracks last rendered state to avoid needless redraw
 local last_summary  = ""
 local last_blocked  = 0
 local blink_on      = true
+local last_sessions = {}
 
 local function render_title()
     if last_blocked == 0 then
@@ -85,6 +101,7 @@ local function update_banner(waiting_sessions)
     local y  = sf.y + 28 + BANNER_MARGIN  -- below menubar
 
     banner = hs.canvas.new({ x = x, y = y, w = BANNER_W, h = h })
+    state.banner = banner
     banner:level(hs.canvas.windowLevels.overlay)
     banner:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
                   + hs.canvas.windowBehaviors.stationary)
@@ -146,34 +163,39 @@ local function apply_data(data)
     bar:setTooltip(#sessions .. " session(s) · " .. waiting .. " waiting")
     update_banner(waiting_sessions)
 
-    local menu = {}
-    for _, s in ipairs(sessions) do
+    last_sessions = sessions
+end
+
+local chooser = hs.chooser.new(function(choice)
+    if choice and choice.pane_target then focus_pane(choice.pane_target) end
+end)
+chooser:searchSubText(true)
+state.chooser = chooser
+
+local function show_chooser()
+    local choices = {}
+    for _, s in ipairs(last_sessions) do
         local icon = STATUS_ICON[s.status] or "❓"
-        local sess = s
         local label = s.project_name or "?"
         if s.session_name then
             label = label .. " · " .. s.session_name
         elseif s.room_id then
             label = label .. " · " .. s.room_id
         end
-        table.insert(menu, {
-            title = icon .. " " .. label,
-            fn = function() focus_pane(sess.pane_target) end,
-        })
+        local sub = (s.status or "") .. " · " .. (s.model_display or "") .. " · " .. (s.context_display or "")
+        choices[#choices + 1] = {
+            text        = icon .. " " .. label,
+            subText     = sub,
+            pane_target = s.pane_target,
+        }
     end
-
-    if #menu == 0 then
-        table.insert(menu, { title = "No active sessions", disabled = true })
-    else
-        table.insert(menu, { title = "-" })
-        table.insert(menu, {
-            title    = #sessions .. " total · " .. waiting .. " waiting",
-            disabled = true,
-        })
+    if #choices == 0 then
+        choices[1] = { text = "No active sessions", subText = "" }
     end
-
-    bar:setMenu(menu)
+    chooser:choices(choices)
+    chooser:show()
 end
+state.show_chooser = show_chooser
 
 local function refresh()
     -- If a previous task is still running, check timeout and skip this tick.
@@ -189,12 +211,15 @@ local function refresh()
     in_flight_started = hs.timer.secondsSinceEpoch()
     in_flight = hs.task.new(MENUBAR_PY, function(_, stdout, _)
         in_flight = nil
+        state.in_flight = nil
         parse_and_apply(stdout, apply_data)
     end)
+    state.in_flight = in_flight
     in_flight:start()
 end
 
 local timer = hs.timer.doEvery(INTERVAL, refresh)
+state.timer = timer
 local blink_timer = hs.timer.doEvery(0.5, function()
     if last_blocked > 0 then
         blink_on = not blink_on
@@ -204,12 +229,10 @@ local blink_timer = hs.timer.doEvery(0.5, function()
         render_title()
     end
 end)
+state.blink_timer = blink_timer
 refresh()
 
-hs.hotkey.bind({"cmd", "alt", "ctrl"}, "'", function()
-    local frame = bar:frame()
-    hs.eventtap.leftClick({ x = frame.x + frame.w / 2, y = frame.y + frame.h / 2 })
-end)
+state.hotkey = hs.hotkey.bind({"cmd", "alt", "ctrl"}, "'", show_chooser)
 
 M.refresh = refresh
 return M
