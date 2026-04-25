@@ -21,6 +21,19 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 MESSAGE=$(echo "$INPUT" | jq -r '.message // empty')
 NOTIF_TYPE=$(echo "$INPUT" | jq -r '.notification_type // empty')
 
+# Suppressed message patterns (one per line, matched as substrings)
+SUPPRESSED_PATTERNS=(
+  "Claude is waiting for your input",
+  "claude-rename-worker"
+)
+
+for pattern in "${SUPPRESSED_PATTERNS[@]}"; do
+  if [[ "$MESSAGE" == *"$pattern"* ]]; then
+    /usr/bin/logger -t "$TAG" "$SCRIPT_NAME: suppressed (matched pattern: $pattern)"
+    exit 0
+  fi
+done
+
 case "$NOTIF_TYPE" in
   permission_prompt) TITLE="🔐 Claude Code — Permission" ;;
   idle_prompt)       TITLE="💬 Claude Code — Input Needed" ;;
