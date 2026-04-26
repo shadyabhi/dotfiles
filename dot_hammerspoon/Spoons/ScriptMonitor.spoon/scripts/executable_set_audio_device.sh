@@ -6,17 +6,14 @@ PREFERRED_INPUT=("Bose QC Ultra 2 Earbuds" "Insta360 Link 2 Pro" "Abhijeet's EX"
 
 AUDIO_SWITCH="/opt/homebrew/bin/SwitchAudioSource"
 
-# Function to set audio device
 set_audio_device() {
     local type=$1
     shift
     local preferred_list=("$@")
 
-    # Get available devices
     local available_devices
     available_devices=$($AUDIO_SWITCH -a -t "$type")
 
-    # Try each preferred device in order
     for device in "${preferred_list[@]}"; do
         if echo "$available_devices" | grep -Fq "$device"; then
             $AUDIO_SWITCH -t "$type" -s "$device" > /dev/null
@@ -32,8 +29,6 @@ set_audio_device() {
 result_input=$(set_audio_device "input" "${PREFERRED_INPUT[@]}")
 result_output=$(set_audio_device "output" "${PREFERRED_OUTPUT[@]}")
 
-# Maximize input volume
 osascript -e "set volume input volume 100"
 
-# Send single summary notification
 osascript -e "display notification \"Preferred audio device set: Input: $result_input, Output: $result_output\" with title \"Audio Devices Set\""

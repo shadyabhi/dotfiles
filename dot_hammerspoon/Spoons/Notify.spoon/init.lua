@@ -1,59 +1,54 @@
--- Standardized notification module
--- Usage:
---   local notify = require("notify")
---   notify.info("Title", "subtitle")        -- green background
---   notify.alert("Title", "subtitle")       -- red background
---   notify.info("Title")                    -- subtitle is optional
---   notify.alert("Title", "sub", 3)         -- custom duration in seconds
+--- === Notify ===
+---
+--- Lightweight on-screen notification widget with info/alert variants.
+--- Usage: spoon.Notify:info("Title", "subtitle"); spoon.Notify:alert("Title", "sub", 3)
 
-local M = {}
+local obj = {}
+obj.__index = obj
 
-local canvas = nil
-local timer = nil
-local fadeTimer = nil
+obj.name = "Notify"
+obj.version = "1.0"
+obj.author = "Abhijeet Rastogi"
+obj.license = "MIT"
 
-local themes = {
-    info = {
-        accent = {red = 0.3, green = 0.75, blue = 0.35, alpha = 1},
-    },
-    alert = {
-        accent = {red = 0.85, green = 0.25, blue = 0.25, alpha = 1},
-    },
+obj.themes = {
+    info  = { accent = { red = 0.3,  green = 0.75, blue = 0.35, alpha = 1 } },
+    alert = { accent = { red = 0.85, green = 0.25, blue = 0.25, alpha = 1 } },
 }
 
-local function show(level, title, subtitle, duration)
-    -- Tear down previous notification
+obj.maxTextWidth = 350
+obj.cornerRadius = 14
+obj.minWidth = 220
+obj.defaultDuration = 1.5
+
+local canvas, timer, fadeTimer = nil, nil, nil
+
+local function show(self, level, title, subtitle, duration)
     if fadeTimer then fadeTimer:stop(); fadeTimer = nil end
     if timer then timer:stop(); timer = nil end
     if canvas then canvas:delete(); canvas = nil end
 
-    local theme = themes[level] or themes.info
-    duration = duration or 1.5
+    local theme = self.themes[level] or self.themes.info
+    duration = duration or self.defaultDuration
 
-    -- Dark macOS notification style
-    local bgColor     = {red = 0.12, green = 0.12, blue = 0.14, alpha = 0.95}
-    local strokeColor  = {red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6}
-    local titleColor   = {white = 1, alpha = 0.95}
-    local subColor     = {white = 1, alpha = 0.55}
+    local bgColor    = { red = 0.12, green = 0.12, blue = 0.14, alpha = 0.95 }
+    local strokeColor = { red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6 }
+    local titleColor = { white = 1, alpha = 0.95 }
+    local subColor   = { white = 1, alpha = 0.55 }
 
-    -- Style constants
-    local pad = 14
-    local gap = 12
-    local iconSize = 36
-    local cornerRadius = 14
-    local titleFont = {name = hs.styledtext.defaultFonts.boldSystem, size = 15}
-    local subFont   = {name = hs.styledtext.defaultFonts.system, size = 13}
+    local pad, gap, iconSize = 14, 12, 36
+    local titleFont = { name = hs.styledtext.defaultFonts.boldSystem, size = 15 }
+    local subFont   = { name = hs.styledtext.defaultFonts.system, size = 13 }
 
-    local styledTitle = hs.styledtext.new(title or "", {font = titleFont, color = titleColor})
+    local styledTitle = hs.styledtext.new(title or "", { font = titleFont, color = titleColor })
     local titleDims = hs.drawing.getTextDrawingSize(styledTitle)
 
     local styledSub, subDims
     if subtitle and subtitle ~= "" then
-        styledSub = hs.styledtext.new(subtitle, {font = subFont, color = subColor})
+        styledSub = hs.styledtext.new(subtitle, { font = subFont, color = subColor })
         subDims = hs.drawing.getTextDrawingSize(styledSub)
     end
 
-    -- App icon from focused window
     local iconImage = nil
     local focusedWin = hs.window.focusedWindow()
     if focusedWin and focusedWin:application() then
@@ -63,8 +58,7 @@ local function show(level, title, subtitle, duration)
     local hasIcon = iconImage ~= nil
     local textW = titleDims.w
     if subDims then textW = math.max(textW, subDims.w) end
-    local maxTextW = 350
-    if textW > maxTextW then textW = maxTextW end
+    if textW > self.maxTextWidth then textW = self.maxTextWidth end
 
     local contentH = titleDims.h
     if subDims then contentH = contentH + 3 + subDims.h end
@@ -77,65 +71,55 @@ local function show(level, title, subtitle, duration)
         totalW = pad + textW + pad
         totalH = pad + contentH + pad
     end
+    if totalW < self.minWidth then totalW = self.minWidth end
 
-    -- Min width for a clean look
-    if totalW < 220 then totalW = 220 end
-
-    -- Position: top-center of the focused screen
     local screen = hs.screen.mainScreen():frame()
     local x = screen.x + (screen.w - totalW) / 2
     local y = screen.y + math.floor((screen.h - totalH) / 2)
 
-    canvas = hs.canvas.new({x = x, y = y, w = totalW, h = totalH})
+    canvas = hs.canvas.new({ x = x, y = y, w = totalW, h = totalH })
 
-    -- Background
     canvas[1] = {
         type = "rectangle",
-        roundedRectRadii = {xRadius = cornerRadius, yRadius = cornerRadius},
+        roundedRectRadii = { xRadius = self.cornerRadius, yRadius = self.cornerRadius },
         fillColor = bgColor,
         strokeColor = strokeColor,
         strokeWidth = 0.5,
     }
-
-    -- Accent bar on left edge
     canvas[2] = {
         type = "rectangle",
-        frame = {x = 0, y = 6, w = 3, h = totalH - 12},
-        roundedRectRadii = {xRadius = 1.5, yRadius = 1.5},
+        frame = { x = 0, y = 6, w = 3, h = totalH - 12 },
+        roundedRectRadii = { xRadius = 1.5, yRadius = 1.5 },
         fillColor = theme.accent,
         strokeWidth = 0,
     }
 
     local nextIdx = 3
     local textX = pad
-
-    -- App icon
     if hasIcon then
         canvas[nextIdx] = {
             type = "image",
             image = iconImage,
-            frame = {x = pad, y = (totalH - iconSize) / 2, w = iconSize, h = iconSize},
+            frame = { x = pad, y = (totalH - iconSize) / 2, w = iconSize, h = iconSize },
             imageScaling = "scaleProportionally",
         }
         nextIdx = nextIdx + 1
         textX = pad + iconSize + gap
     end
 
-    -- Title
     local textY = hasIcon and (totalH - contentH) / 2 or pad
     canvas[nextIdx] = {
         type = "text",
         text = styledTitle,
-        frame = {x = textX, y = textY, w = textW, h = titleDims.h},
+        frame = { x = textX, y = textY, w = textW, h = titleDims.h },
     }
     nextIdx = nextIdx + 1
 
-    -- Subtitle
     if styledSub then
         canvas[nextIdx] = {
             type = "text",
             text = styledSub,
-            frame = {x = textX, y = textY + titleDims.h + 3, w = textW, h = subDims.h},
+            frame = { x = textX, y = textY + titleDims.h + 3, w = textW, h = subDims.h },
         }
     end
 
@@ -143,19 +127,16 @@ local function show(level, title, subtitle, duration)
     canvas:alpha(0)
     canvas:show()
 
-    -- Fade in
     local fadeInTimer
     fadeInTimer = hs.timer.doEvery(0.015, function()
         local a = canvas:alpha()
         if a >= 0.95 then
-            canvas:alpha(1)
-            fadeInTimer:stop()
+            canvas:alpha(1); fadeInTimer:stop()
         else
             canvas:alpha(a + 0.12)
         end
     end)
 
-    -- Fade out after duration
     timer = hs.timer.doAfter(duration, function()
         fadeTimer = hs.timer.doEvery(0.02, function()
             local a = canvas:alpha()
@@ -169,12 +150,12 @@ local function show(level, title, subtitle, duration)
     end)
 end
 
-function M.info(title, subtitle, duration)
-    show("info", title, subtitle, duration)
+function obj:info(title, subtitle, duration)
+    show(self, "info", title, subtitle, duration)
 end
 
-function M.alert(title, subtitle, duration)
-    show("alert", title, subtitle, duration)
+function obj:alert(title, subtitle, duration)
+    show(self, "alert", title, subtitle, duration)
 end
 
-return M
+return obj
