@@ -16,10 +16,18 @@ if [[ -n "$CURSOR_VERSION" ]]; then
   exit 0
 fi
 
-PROJECT=$(basename "$(echo "$INPUT" | jq -r '.cwd')")
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+PROJECT=$(basename "$CWD")
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 MESSAGE=$(echo "$INPUT" | jq -r '.message // empty')
 NOTIF_TYPE=$(echo "$INPUT" | jq -r '.notification_type // empty')
+
+# Suppress notifications from claude-rename background worker sessions.
+# The worker runs `claude -p` with cwd=$TMPDIR/claude-rename-worker.
+if [[ "$CWD" == */claude-rename-worker* ]]; then
+  /usr/bin/logger -t "$TAG" "$SCRIPT_NAME: suppressed (claude-rename worker cwd: $CWD)"
+  exit 0
+fi
 
 LOG_DIR="$HOME/.claude/logs"
 LOG_FILE="$LOG_DIR/notifications.log"
