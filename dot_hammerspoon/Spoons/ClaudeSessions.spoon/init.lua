@@ -53,6 +53,24 @@ local function teardown_prior()
         if s.bar then s.bar:delete() end
         if s.banner then s.banner:hide() end
         if s.hotkey then s.hotkey:delete() end
+        if s.caffeinate then pcall(function() s.caffeinate:terminate() end) end
+    end
+end
+
+local function caffeinate_set(state, want)
+    if state.caffeinate and not state.caffeinate:isRunning() then
+        state.caffeinate = nil
+    end
+    if want and not state.caffeinate then
+        local t = hs.task.new("/usr/bin/caffeinate", function()
+            if _G._claude_sessions_state then
+                _G._claude_sessions_state.caffeinate = nil
+            end
+        end, { "-di" })
+        if t then t:start(); state.caffeinate = t end
+    elseif (not want) and state.caffeinate then
+        pcall(function() state.caffeinate:terminate() end)
+        state.caffeinate = nil
     end
 end
 
@@ -145,11 +163,13 @@ function obj:start()
 
     local function apply_data(data)
         local sessions = data.details
-        local waiting, waiting_sessions = 0, {}
+        local waiting, waiting_sessions, working = 0, {}, 0
         for _, s in ipairs(sessions) do
             if s.status == "Input" then
                 waiting = waiting + 1
                 waiting_sessions[#waiting_sessions + 1] = s
+            elseif s.status == "Working" then
+                working = working + 1
             end
         end
         last_summary = data.summary
@@ -157,6 +177,7 @@ function obj:start()
         render_title()
         bar:setTooltip(#sessions .. " session(s) · " .. waiting .. " waiting")
         update_banner(waiting_sessions)
+        caffeinate_set(state, working > 0)
         last_sessions = sessions
     end
 
