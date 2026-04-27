@@ -49,6 +49,7 @@ local function teardown_prior()
         local s = _G._claude_sessions_state
         if s.timer then s.timer:stop() end
         if s.blink_timer then s.blink_timer:stop() end
+        if s.age_tick then s.age_tick:stop() end
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
         if s.banner then s.banner:hide() end
@@ -154,7 +155,10 @@ function obj:start()
         return cwd
     end
 
+    local last_waiting = {}
+
     local function update_banner(waiting_sessions)
+        last_waiting = waiting_sessions
         local n = #waiting_sessions
         local lines, key_parts = {}, {}
         for _, s in ipairs(waiting_sessions) do
@@ -276,6 +280,15 @@ function obj:start()
         end
     end)
     state.blink_timer = blink_timer
+
+    local age_tick = hs.timer.doEvery(30, function()
+        if banner and #last_waiting > 0 then
+            banner_key = nil
+            update_banner(last_waiting)
+        end
+    end)
+    state.age_tick = age_tick
+
     refresh()
 
     if self.hotkey then
