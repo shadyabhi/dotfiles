@@ -22,7 +22,7 @@ local audioWatcherStarted = false
 local screenWatcher = nil
 
 function obj:resource(name)
-    return hs.spoons.resourcePath("scripts/" .. name)
+    return self.spoonPath .. "scripts/" .. name
 end
 
 function obj:addEvent(spec)
@@ -58,8 +58,9 @@ function obj:start()
     end
 
     if needAudio and not audioWatcherStarted then
+        local audioTriggers = { ["dev#"] = true, ["dIn "] = true, ["dOut"] = true }
         hs.audiodevice.watcher.setCallback(function(event)
-            if event ~= "dev#" then return end
+            if not audioTriggers[event] then return end
             for _, ev in ipairs(events) do
                 for _, src in ipairs(ev.on or {}) do
                     if src == "audioDevice" then fireEvent(ev) end
