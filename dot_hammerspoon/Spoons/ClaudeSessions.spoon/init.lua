@@ -23,10 +23,8 @@ obj.tmuxSocket = "/private/tmp/tmux-" .. UID .. "/default"
 obj.hotkey = nil
 
 obj.theme = {
-    bannerW       = 200,
-    bannerPad     = 12,
-    bannerLineH   = 18,
-    bannerMargin  = 8,
+    bannerW       = 360,
+    bannerYFrac   = 0.10,
     statusIcon    = { Input = "🔔", Working = "🤔", Idle = "💤" },
 }
 
@@ -53,7 +51,7 @@ local function teardown_prior()
         if s.blink_timer then s.blink_timer:stop() end
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
-        if s.banner then s.banner:delete() end
+        if s.banner then s.banner:hide() end
         if s.hotkey then s.hotkey:delete() end
     end
 end
@@ -127,52 +125,22 @@ function obj:start()
         if key == banner_key then return end
         banner_key = key
 
-        if banner then banner:delete(); banner = nil end
+        if banner then banner:hide(); banner = nil; state.banner = nil end
         if n == 0 then return end
 
-        local lines = n + 1
-        local h = theme.bannerPad * 2 + theme.bannerLineH * lines + 4
-        local sf = hs.screen.mainScreen():frame()
-        local x  = sf.x + sf.w - theme.bannerW - theme.bannerMargin
-        local y  = sf.y + 28 + theme.bannerMargin
-
-        banner = hs.canvas.new({ x = x, y = y, w = theme.bannerW, h = h })
-        state.banner = banner
-        banner:level(hs.canvas.windowLevels.overlay)
-        banner:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
-                      + hs.canvas.windowBehaviors.stationary)
-        banner:appendElements({
-            type             = "rectangle",
-            action           = "fill",
-            fillColor        = { red = 0.08, green = 0.08, blue = 0.1, alpha = 0.93 },
-            roundedRectRadii = { xRadius = 10, yRadius = 10 },
-            frame            = { x = 0, y = 0, w = theme.bannerW, h = h },
-        })
-        banner:appendElements({
-            type      = "text",
-            text      = "✴️ " .. n .. " waiting",
-            textColor = { red = 1, green = 0.72, blue = 0.2, alpha = 1 },
-            textSize  = 13,
-            textFont  = "Menlo",
-            frame     = { x = theme.bannerPad, y = theme.bannerPad,
-                          w = theme.bannerW - theme.bannerPad * 2, h = theme.bannerLineH },
-        })
-        for i, s in ipairs(waiting_sessions) do
-            banner:appendElements({
-                type      = "text",
-                text      = "  " .. (s.project_name or "?"),
-                textColor = { white = 1, alpha = 0.85 },
-                textSize  = 12,
-                textFont  = "Menlo",
-                frame     = {
-                    x = theme.bannerPad,
-                    y = theme.bannerPad + theme.bannerLineH + 4 + (i - 1) * theme.bannerLineH,
-                    w = theme.bannerW - theme.bannerPad * 2,
-                    h = theme.bannerLineH,
-                },
-            })
+        if not (spoon and spoon.Notify and spoon.Notify.banner) then
+            hs.printf("[ClaudeSessions] Notify spoon not loaded; skipping banner")
+            return
         end
-        banner:show()
+
+        banner = spoon.Notify:banner({
+            level     = "alert",
+            title     = "✴️ " .. n .. " waiting",
+            lines     = names,
+            width     = theme.bannerW,
+            yFraction = theme.bannerYFrac,
+        })
+        state.banner = banner
     end
 
     local function apply_data(data)

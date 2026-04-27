@@ -158,4 +158,80 @@ function obj:alert(title, subtitle, duration)
     show(self, "alert", title, subtitle, duration)
 end
 
+function obj:banner(opts)
+    local handle = { _opts = opts or {}, _canvas = nil }
+
+    local function render(o)
+        local theme = self.themes[o.level or "alert"] or self.themes.alert
+        local pad, lineH = 16, 24
+        local title = o.title or ""
+        local lines = o.lines or {}
+        local w = o.width or 360
+        local h = pad * 2 + lineH + (#lines > 0 and (4 + #lines * lineH) or 0)
+
+        local sf = hs.screen.mainScreen():frame()
+        local yFrac = o.yFraction or 0.5
+        local x = sf.x + (sf.w - w) / 2
+        local y = sf.y + sf.h * yFrac
+
+        if handle._canvas then handle._canvas:delete() end
+        local c = hs.canvas.new({ x = x, y = y, w = w, h = h })
+        c:level(hs.canvas.windowLevels.overlay)
+        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
+                 + hs.canvas.windowBehaviors.stationary)
+
+        c[1] = {
+            type = "rectangle",
+            roundedRectRadii = { xRadius = self.cornerRadius, yRadius = self.cornerRadius },
+            fillColor   = { red = 0.12, green = 0.12, blue = 0.14, alpha = 0.95 },
+            strokeColor = { red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6 },
+            strokeWidth = 0.5,
+        }
+        c[2] = {
+            type = "rectangle",
+            frame = { x = 0, y = 6, w = 3, h = h - 12 },
+            roundedRectRadii = { xRadius = 1.5, yRadius = 1.5 },
+            fillColor = theme.accent,
+            strokeWidth = 0,
+        }
+        c[3] = {
+            type      = "text",
+            text      = title,
+            textColor = theme.accent,
+            textSize  = 18,
+            textFont  = "Menlo",
+            frame     = { x = pad, y = pad, w = w - pad * 2, h = lineH },
+        }
+        for i, line in ipairs(lines) do
+            c[3 + i] = {
+                type      = "text",
+                text      = "  " .. line,
+                textColor = { white = 1, alpha = 0.85 },
+                textSize  = 16,
+                textFont  = "Menlo",
+                frame     = {
+                    x = pad,
+                    y = pad + lineH + 4 + (i - 1) * lineH,
+                    w = w - pad * 2,
+                    h = lineH,
+                },
+            }
+        end
+        c:show()
+        handle._canvas = c
+    end
+
+    function handle:update(o)
+        self._opts = o or self._opts
+        render(self._opts)
+    end
+
+    function handle:hide()
+        if self._canvas then self._canvas:delete(); self._canvas = nil end
+    end
+
+    render(handle._opts)
+    return handle
+end
+
 return obj
