@@ -202,21 +202,47 @@ function obj:banner(opts)
             textFont  = "Menlo",
             frame     = { x = pad, y = pad, w = w - pad * 2, h = lineH },
         }
+
+        local hlIdx = {}
         for i, line in ipairs(lines) do
-            c[3 + i] = {
+            local lineY = pad + lineH + 4 + (i - 1) * lineH
+            local hi = #c + 1
+            c[hi] = {
+                type = "rectangle",
+                action = "fill",
+                frame = { x = pad - 6, y = lineY - 2, w = w - (pad - 6) * 2, h = lineH + 2 },
+                roundedRectRadii = { xRadius = 4, yRadius = 4 },
+                fillColor = { white = 1, alpha = 0 },
+                strokeWidth = 0,
+            }
+            hlIdx[i] = hi
+            c[#c + 1] = {
                 type      = "text",
+                id        = "line_" .. i,
+                trackMouseDown      = true,
+                trackMouseEnterExit = true,
                 text      = "  " .. line,
                 textColor = { white = 1, alpha = 0.85 },
                 textSize  = 16,
                 textFont  = "Menlo",
-                frame     = {
-                    x = pad,
-                    y = pad + lineH + 4 + (i - 1) * lineH,
-                    w = w - pad * 2,
-                    h = lineH,
-                },
+                frame     = { x = pad, y = lineY, w = w - pad * 2, h = lineH },
             }
         end
+
+        c:mouseCallback(function(_, evt, elemId)
+            if type(elemId) ~= "string" then return end
+            local idx = tonumber(elemId:match("^line_(%d+)$"))
+            if not idx then return end
+            local hi = hlIdx[idx]
+            if evt == "mouseEnter" and hi then
+                c[hi].fillColor = { white = 1, alpha = 0.12 }
+            elseif evt == "mouseExit" and hi then
+                c[hi].fillColor = { white = 1, alpha = 0 }
+            elseif evt == "mouseDown" and o.onClick then
+                o.onClick(lines[idx], idx)
+            end
+        end)
+
         c:show()
         handle._canvas = c
     end

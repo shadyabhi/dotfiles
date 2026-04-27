@@ -146,6 +146,8 @@ def build_payload() -> dict:
             "pid": pid,
             "model_display": s.get("version") or "",
             "context_display": s.get("kind") or "",
+            "started_at": s.get("startedAt"),
+            "updated_at": s.get("updatedAt"),
         })
 
     details.sort(key=lambda s: (

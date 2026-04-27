@@ -23,7 +23,7 @@ obj.tmuxSocket = "/private/tmp/tmux-" .. UID .. "/default"
 obj.hotkey = nil
 
 obj.theme = {
-    bannerW       = 360,
+    bannerW       = 520,
     bannerYFrac   = 0.10,
     statusIcon    = { Input = "🔔", Working = "🤔", Idle = "💤" },
 }
@@ -135,11 +135,35 @@ function obj:start()
         hs.application.launchOrFocus(self.terminalApp)
     end
 
+    local function fmt_ago(ms)
+        if not ms or type(ms) ~= "number" then return "?" end
+        local secs = math.max(0, math.floor(os.time() - ms / 1000))
+        if secs < 60 then return secs .. "s ago" end
+        local mins = math.floor(secs / 60)
+        if mins < 60 then return mins .. "m ago" end
+        local hrs = math.floor(mins / 60)
+        return string.format("%dh%02dm ago", hrs, mins % 60)
+    end
+
+    local function shorten_cwd(cwd)
+        if not cwd then return "?" end
+        local home = os.getenv("HOME") or ""
+        if home ~= "" and cwd:sub(1, #home) == home then
+            return "~" .. cwd:sub(#home + 1)
+        end
+        return cwd
+    end
+
     local function update_banner(waiting_sessions)
         local n = #waiting_sessions
-        local names = {}
-        for _, s in ipairs(waiting_sessions) do names[#names+1] = s.project_name or "?" end
-        local key = table.concat(names, "|")
+        local lines, key_parts = {}, {}
+        for _, s in ipairs(waiting_sessions) do
+            local cwd = shorten_cwd(s.cwd)
+            local age = fmt_ago(s.started_at)
+            lines[#lines+1] = cwd .. "  ·  started " .. age
+            key_parts[#key_parts+1] = (s.session_id or s.cwd or "?") .. "@" .. tostring(s.started_at or 0)
+        end
+        local key = table.concat(key_parts, "|")
         if key == banner_key then return end
         banner_key = key
 
@@ -151,12 +175,18 @@ function obj:start()
             return
         end
 
+        local clickTargets = {}
+        for i, s in ipairs(waiting_sessions) do clickTargets[i] = s.pane_target end
         banner = spoon.Notify:banner({
             level     = "alert",
             title     = "✴️ " .. n .. " waiting",
-            lines     = names,
+            lines     = lines,
             width     = theme.bannerW,
             yFraction = theme.bannerYFrac,
+            onClick   = function(_, idx)
+                local pane = clickTargets[idx]
+                if pane then focus_pane(pane) end
+            end,
         })
         state.banner = banner
     end
