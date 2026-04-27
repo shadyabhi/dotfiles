@@ -109,7 +109,11 @@ function obj:start()
 
     local function focus_pane(pane)
         local tmux = "/opt/homebrew/bin/tmux -S " .. self.tmuxSocket
-        local win = pane:match("^(.+)%.[^.]+$") or pane
+        local sess = pane:match("^([^:]+):") or ""
+        local win  = pane:match("^(.+)%.[^.]+$") or pane
+        if sess ~= "" then
+            hs.execute(tmux .. " switch-client -t '" .. sess .. "' 2>/dev/null")
+        end
         hs.execute(tmux .. " select-window -t '" .. win .. "' 2>/dev/null")
         hs.execute(tmux .. " select-pane -t '" .. pane .. "' 2>/dev/null")
         hs.application.launchOrFocus(self.terminalApp)
