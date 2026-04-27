@@ -150,7 +150,7 @@ function obj:start()
         })
         banner:appendElements({
             type      = "text",
-            text      = "🔔 " .. n .. " waiting",
+            text      = "✴️ " .. n .. " waiting",
             textColor = { red = 1, green = 0.72, blue = 0.2, alpha = 1 },
             textSize  = 13,
             textFont  = "Menlo",
