@@ -151,14 +151,15 @@ def main():
         prog="tmux-replay",
         description="Build a tmux window of titled panes from a YAML config.",
     )
-    p.add_argument("-n", "--name", default="replay",
-                   help="window/session name (default: replay)")
+    p.add_argument("-n", "--name", default=None,
+                   help="window/session name (default: config filename stem)")
     p.add_argument("-N", "--new-session", action="store_true",
                    help="force a new tmux session even when inside tmux")
     p.add_argument("config", help="path to YAML config file")
     args = p.parse_args()
 
     rows = load_config(args.config)
+    name = args.name or os.path.splitext(os.path.basename(args.config))[0] or "replay"
     inside_tmux = bool(os.environ.get("TMUX"))
     use_window = inside_tmux and not args.new_session
 
@@ -167,14 +168,14 @@ def main():
 
     if use_window:
         session = tmux("display-message", "-p", "#S", capture=True)
-        window = unique_name(args.name, "window")
+        window = unique_name(name, "window")
         first_pane = tmux(
             "new-window", "-d", "-n", window, "-P", "-F", "#{pane_id}",
             wrapped, capture=True,
         )
         target_window = f"{session}:{window}"
     else:
-        session = unique_name(args.name, "session")
+        session = unique_name(name, "session")
         first_pane = tmux(
             "new-session", "-d", "-s", session, "-P", "-F", "#{pane_id}",
             wrapped, capture=True,
