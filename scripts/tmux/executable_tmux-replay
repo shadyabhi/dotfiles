@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""tmux-replay: build a tmux window of titled panes from a YAML config.
+
+Config format:
+    row1:
+      title1: cmd
+      title2: cmd
+    row2:
+      title3: cmd
+"""
+import argparse
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+
+def die(msg, code=1):
+    print(f"tmux-replay: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def tmux(*args, capture=False):
+    try:
+        r = subprocess.run(
+            ["tmux", *args],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+        )
+    except FileNotFoundError:
+        die("tmux not found in PATH")
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr or "").strip()
+        die(f"tmux {' '.join(args)} failed: {err}")
+    return r.stdout.strip() if capture else None
+
+
+def load_config(path):
+    try:
+        text = open(path).read()
+    except OSError as e:
+        die(f"cannot read {path}: {e}")
+    try:
+        import yaml  # type: ignore
+        data = yaml.safe_load(text)
+    except ImportError:
+        data = parse_simple(text)
+    if not isinstance(data, dict) or not data:
+        die("config must be a non-empty mapping of rows")
+    rows = []
+    for row_name, panes in data.items():
+        if not isinstance(panes, dict) or not panes:
+            die(f"row {row_name!r} must be a non-empty mapping of title: cmd")
+        pane_list = []
+        for title, cmd in panes.items():
+            if not isinstance(cmd, str):
+                die(f"{row_name}.{title}: cmd must be a string")
+            pane_list.append((str(title), cmd))
+        rows.append((str(row_name), pane_list))
+    return rows
+
+
+def parse_simple(text):
+    """Indent-based fallback: row at column 0, panes indented."""
+    data = {}
+    current = None
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        line = raw.rstrip()
+        if not line or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
+            m = re.match(r"^([^:]+):\s*$", line)
+            if not m:
+                die(f"line {lineno}: expected 'rowname:'")
+            current = m.group(1).strip()
+            data[current] = {}
+        else:
+            if current is None:
+                die(f"line {lineno}: pane entry before any row")
+            m = re.match(r"^\s+([^:]+):\s*(.+)$", line)
+            if not m:
+                die(f"line {lineno}: expected '  title: cmd'")
+            data[current][m.group(1).strip()] = m.group(2).strip()
+    return data
+
+
+def wrap_cmd(cmd):
+    inner = (
+        f'{cmd}; status=$?; '
+        f'printf "\\n[exited %s] press enter to close..." "$status"; '
+        f'read _'
+    )
+    return f"sh -c {shlex.quote(inner)}"
+
+
+def unique_name(base, kind):
+    """kind: 'session' or 'window'. Returns base-N where N is the lowest free index."""
+    n = 0
+    while True:
+        candidate = f"{base}-{n}"
+        if kind == "session":
+            r = subprocess.run(
+                ["tmux", "has-session", "-t", candidate],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if r.returncode != 0:
+                return candidate
+        else:
+            existing = tmux("list-windows", "-F", "#W", capture=True) or ""
+            if candidate not in existing.splitlines():
+                return candidate
+        n += 1
+
+
+def set_title(pane_id, title):
+    tmux("select-pane", "-t", pane_id, "-T", title)
+
+
+def start_caffeinate(use_window, session, window_name):
+    """Run `caffeinate -d` while the target window/session exists (macOS only)."""
+    if sys.platform != "darwin" or not shutil.which("caffeinate"):
+        return
+    if use_window:
+        cond = (
+            f"tmux list-windows -t {shlex.quote(session)} -F '#W' 2>/dev/null "
+            f"| grep -qxF {shlex.quote(window_name)}"
+        )
+    else:
+        cond = f"tmux has-session -t {shlex.quote(session)} 2>/dev/null"
+    # `caffeinate -w $$` exits when this watcher shell exits, even on SIGKILL,
+    # so caffeinate cannot be orphaned.
+    script = (
+        f"caffeinate -d -w $$ & "
+        f"while {cond}; do sleep 5; done"
+    )
+    subprocess.Popen(
+        ["sh", "-c", script],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="tmux-replay",
+        description="Build a tmux window of titled panes from a YAML config.",
+    )
+    p.add_argument("-n", "--name", default="replay",
+                   help="window/session name (default: replay)")
+    p.add_argument("-N", "--new-session", action="store_true",
+                   help="force a new tmux session even when inside tmux")
+    p.add_argument("config", help="path to YAML config file")
+    args = p.parse_args()
+
+    rows = load_config(args.config)
+    inside_tmux = bool(os.environ.get("TMUX"))
+    use_window = inside_tmux and not args.new_session
+
+    first_title, first_cmd = rows[0][1][0]
+    wrapped = wrap_cmd(first_cmd)
+
+    if use_window:
+        session = tmux("display-message", "-p", "#S", capture=True)
+        window = unique_name(args.name, "window")
+        first_pane = tmux(
+            "new-window", "-d", "-n", window, "-P", "-F", "#{pane_id}",
+            wrapped, capture=True,
+        )
+        target_window = f"{session}:{window}"
+    else:
+        session = unique_name(args.name, "session")
+        first_pane = tmux(
+            "new-session", "-d", "-s", session, "-P", "-F", "#{pane_id}",
+            wrapped, capture=True,
+        )
+        target_window = f"{session}:"
+
+    # Pane title display on the target window.
+    tmux("set-window-option", "-t", target_window, "pane-border-status", "top")
+    tmux("set-window-option", "-t", target_window,
+         "pane-border-format", "#{pane_title}")
+    tmux("set-window-option", "-t", target_window, "synchronize-panes", "off")
+
+    set_title(first_pane, first_title)
+
+    # Build row spines first (vertical splits anchored to last spine pane),
+    # then horizontal fills within each row anchored to that row's spine pane.
+    spine_ids = [first_pane]
+    for r_idx in range(1, len(rows)):
+        _, panes = rows[r_idx]
+        title, cmd = panes[0]
+        new_id = tmux(
+            "split-window", "-v", "-t", spine_ids[-1],
+            "-P", "-F", "#{pane_id}", wrap_cmd(cmd), capture=True,
+        )
+        set_title(new_id, title)
+        spine_ids.append(new_id)
+
+    for r_idx, (_, panes) in enumerate(rows):
+        anchor = spine_ids[r_idx]
+        for title, cmd in panes[1:]:
+            new_id = tmux(
+                "split-window", "-h", "-t", anchor,
+                "-P", "-F", "#{pane_id}", wrap_cmd(cmd), capture=True,
+            )
+            set_title(new_id, title)
+
+    start_caffeinate(use_window, session, window if use_window else None)
+
+    # Tail: focus / attach.
+    if use_window:
+        tmux("select-window", "-t", target_window)
+    elif inside_tmux:
+        tmux("switch-client", "-t", session)
+    else:
+        os.execvp("tmux", ["tmux", "attach-session", "-t", session])
+
+
+if __name__ == "__main__":
+    main()
