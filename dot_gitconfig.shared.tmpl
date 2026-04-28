@@ -86,7 +86,7 @@
     searchCommitWithPattern = log -sP  # search commits
 
     # Contributors: aggregate lines added+removed per author, sorted desc. Pass paths after the alias.
-    contributors = "!git log --numstat --pretty=\"%an\" \"$@\" | awk 'NF==1 {a=tolower($0); next} NF==3 && $1!=\"-\" {t[a]+=$1+$2} END {for (n in t) printf \"%d\\t%s\\n\", t[n], n}' | sort -rn #"
+    contributors = "!git log --numstat --pretty=format:\"@@%an\" \"$@\" | awk '/^@@/ {a=tolower(substr($0,3)); next} NF==3 && $1!=\"-\" {add[a]+=$1; del[a]+=$2} END {for (n in add) printf \"%d\\t+%d\\t-%d\\t%s\\n\", add[n]+del[n], add[n], del[n], n}' | sort -rn #"
 
 
 [push]
