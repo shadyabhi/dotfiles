@@ -85,6 +85,9 @@
     searchBranchWithCommit = "!f() { pattern=\"$1\"; commit=\"$2\"; count=\"${3:-1}\"; git fetch --quiet; found=0; for branch in $(git branch -r -l \"$pattern\" --sort=-creatordate); do if git merge-base --is-ancestor \"$commit\" \"$branch\" 2>/dev/null; then echo \"$branch\"; found=$((found + 1)); if [ \"$found\" -ge \"$count\" ]; then break; fi; fi; done; if [ \"$found\" -eq 0 ]; then echo \"No matching branch found.\"; fi; }; f"
     searchCommitWithPattern = log -sP  # search commits
 
+    # Contributors: aggregate lines added+removed per author, sorted desc. Pass paths after the alias.
+    contributors = "!git log --numstat --pretty=\"%an\" \"$@\" | awk 'NF==1 {a=tolower($0); next} NF==3 && $1!=\"-\" {t[a]+=$1+$2} END {for (n in t) printf \"%d\\t%s\\n\", t[n], n}' | sort -rn #"
+
 
 [push]
     default = current
