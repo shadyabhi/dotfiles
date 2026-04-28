@@ -174,7 +174,11 @@ function obj:banner(opts)
         local x = sf.x + (sf.w - w) / 2
         local y = sf.y + sf.h * yFrac
 
-        if handle._canvas then handle._canvas:delete() end
+        if handle._canvas then
+            local tl = handle._canvas:topLeft()
+            x, y = tl.x, tl.y
+            handle._canvas:delete()
+        end
         local c = hs.canvas.new({ x = x, y = y, w = w, h = h })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
@@ -182,6 +186,8 @@ function obj:banner(opts)
 
         c[1] = {
             type = "rectangle",
+            id   = "bg",
+            trackMouseDown = true,
             roundedRectRadii = { xRadius = self.cornerRadius, yRadius = self.cornerRadius },
             fillColor   = { red = 0.12, green = 0.12, blue = 0.14, alpha = 0.95 },
             strokeColor = { red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6 },
@@ -196,6 +202,8 @@ function obj:banner(opts)
         }
         c[3] = {
             type      = "text",
+            id        = "title",
+            trackMouseDown = true,
             text      = title,
             textColor = theme.accent,
             textSize  = 18,
@@ -229,8 +237,36 @@ function obj:banner(opts)
             }
         end
 
+        local dragTap = nil
+        local function startDrag()
+            if dragTap then return end
+            local origin = c:topLeft()
+            local startMouse = hs.mouse.absolutePosition()
+            local dx = startMouse.x - origin.x
+            local dy = startMouse.y - origin.y
+            dragTap = hs.eventtap.new({
+                hs.eventtap.event.types.mouseMoved,
+                hs.eventtap.event.types.leftMouseDragged,
+                hs.eventtap.event.types.leftMouseUp,
+            }, function(e)
+                local t = e:getType()
+                if t == hs.eventtap.event.types.leftMouseUp then
+                    if dragTap then dragTap:stop(); dragTap = nil end
+                    return false
+                end
+                local p = hs.mouse.absolutePosition()
+                c:topLeft({ x = p.x - dx, y = p.y - dy })
+                return false
+            end)
+            dragTap:start()
+        end
+
         c:mouseCallback(function(_, evt, elemId)
             if type(elemId) ~= "string" then return end
+            if elemId == "bg" or elemId == "title" then
+                if evt == "mouseDown" then startDrag() end
+                return
+            end
             local idx = tonumber(elemId:match("^line_(%d+)$"))
             if not idx then return end
             local hi = hlIdx[idx]

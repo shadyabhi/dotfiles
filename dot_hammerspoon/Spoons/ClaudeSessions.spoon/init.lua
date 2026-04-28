@@ -171,8 +171,10 @@ function obj:start()
         if key == banner_key then return end
         banner_key = key
 
-        if banner then banner:hide(); banner = nil; state.banner = nil end
-        if n == 0 then return end
+        if n == 0 then
+            if banner then banner:hide(); banner = nil; state.banner = nil end
+            return
+        end
 
         if not (spoon and spoon.Notify and spoon.Notify.banner) then
             hs.printf("[ClaudeSessions] Notify spoon not loaded; skipping banner")
@@ -181,7 +183,7 @@ function obj:start()
 
         local clickTargets = {}
         for i, s in ipairs(waiting_sessions) do clickTargets[i] = s.pane_target end
-        banner = spoon.Notify:banner({
+        local opts = {
             level     = "alert",
             title     = "✴️ " .. n .. " waiting",
             lines     = lines,
@@ -191,7 +193,12 @@ function obj:start()
                 local pane = clickTargets[idx]
                 if pane then focus_pane(pane) end
             end,
-        })
+        }
+        if banner then
+            banner:update(opts)
+        else
+            banner = spoon.Notify:banner(opts)
+        end
         state.banner = banner
     end
 
