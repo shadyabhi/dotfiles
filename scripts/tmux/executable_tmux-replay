@@ -97,22 +97,24 @@ def wrap_cmd(cmd):
     return f"sh -c {shlex.quote(inner)}"
 
 
+def name_exists(name, kind):
+    if kind == "session":
+        r = subprocess.run(
+            ["tmux", "has-session", "-t", name],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return r.returncode == 0
+    existing = tmux("list-windows", "-F", "#W", capture=True) or ""
+    return name in existing.splitlines()
+
+
 def unique_name(base, kind):
-    """kind: 'session' or 'window'. Returns base-N where N is the lowest free index."""
+    """Returns base-N where N is the lowest free index."""
     n = 0
     while True:
         candidate = f"{base}-{n}"
-        if kind == "session":
-            r = subprocess.run(
-                ["tmux", "has-session", "-t", candidate],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-            if r.returncode != 0:
-                return candidate
-        else:
-            existing = tmux("list-windows", "-F", "#W", capture=True) or ""
-            if candidate not in existing.splitlines():
-                return candidate
+        if not name_exists(candidate, kind):
+            return candidate
         n += 1
 
 
@@ -155,6 +157,10 @@ def main():
                    help="window/session name (default: config filename stem)")
     p.add_argument("-N", "--new-session", action="store_true",
                    help="force a new tmux session even when inside tmux")
+    p.add_argument("--warn-existing", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="warn if a window/session with the base name already exists "
+                        "(default: on; use --no-warn-existing to disable)")
     p.add_argument("config", help="path to YAML config file")
     args = p.parse_args()
 
@@ -162,6 +168,19 @@ def main():
     name = args.name or os.path.splitext(os.path.basename(args.config))[0] or "replay"
     inside_tmux = bool(os.environ.get("TMUX"))
     use_window = inside_tmux and not args.new_session
+    kind = "window" if use_window else "session"
+    if args.warn_existing:
+        clashes = []
+        n = 0
+        while name_exists(f"{name}-{n}", kind):
+            clashes.append(f"{name}-{n}")
+            n += 1
+        if clashes:
+            print(
+                f"tmux-replay: warning: existing {kind}(s) with base "
+                f"{name!r}: {', '.join(clashes)}",
+                file=sys.stderr,
+            )
 
     first_title, first_cmd = rows[0][1][0]
     wrapped = wrap_cmd(first_cmd)
