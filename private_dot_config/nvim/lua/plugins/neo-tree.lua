@@ -16,6 +16,11 @@ return {
     filesystem = {
       follow_current_file = { enabled = true },
       hijack_netrw_behavior = "open_default",
+      bind_to_cwd = false,
+      cwd_target = {
+        sidebar = "none",
+        current = "none",
+      },
     },
     window = {
       width = 32,
