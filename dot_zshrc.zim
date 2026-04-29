@@ -127,3 +127,12 @@ for key ('k') bindkey -M vicmd ${key} history-substring-search-up
 for key ('j') bindkey -M vicmd ${key} history-substring-search-down
 unset key
 # }}} End configuration added by Zim install
+
+# Inside tmux, suppress zim termtitle's title-set escapes so they can never
+# rename a tmux window (belt-and-suspenders with `allow-rename off` in
+# ~/.tmux.conf).
+if [[ -n ${TMUX} ]]; then
+  autoload -Uz add-zsh-hook
+  add-zsh-hook -d precmd termtitle_update_precmd 2>/dev/null
+  unfunction termtitle_update_precmd 2>/dev/null
+fi
