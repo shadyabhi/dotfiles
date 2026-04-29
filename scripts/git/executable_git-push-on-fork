@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# git push-on-fork — push the current branch to the personal fork and set upstream.
+# Refuses to push main/master. Auto-creates the fork on first use.
+set -euo pipefail
+
+source "$(dirname "$0")/_fork_lib.sh"
+
+branch=$(git symbolic-ref --short HEAD)
+case "$branch" in
+    main|master)
+        echo "ERROR: refusing to push '$branch' to fork" >&2
+        exit 1
+        ;;
+esac
+
+ensure_fork
+git push -u "$fork_remote" "$branch"

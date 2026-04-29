@@ -66,6 +66,16 @@
     deletelocalbranch = branch -D
     deleteremotebranch = push origin --delete
 
+    # Fork workflow (no push on origin → work via personal GHE fork):
+    #   git sync-fork          # ff fork's default branch from origin (auto-creates fork)
+    #   git checkout -b feat/x  # branch off master as usual
+    #   ...hack, commit...
+    #   git push-on-fork       # push branch to fork, sets upstream
+    #   git pf                 # subsequent force-pushes (uses upstream → fork)
+    #   git open-pr            # open browser: compare fork:branch → origin:default
+    # Override fork remote name (default ${USER}-fork): git config fork.remote <name>
+    # Scripts: ~/scripts/git/git-{sync-fork,push-on-fork,open-pr} (git auto-discovers git-* on PATH).
+
     pf = "!f() { branch=$(git symbolic-ref --short HEAD); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo \"ERROR: force push to '$branch' is not allowed\"; exit 1; fi; git push --force-with-lease \"$@\"; }; f"  # force push, blocked on main/master
 
     # Rebase

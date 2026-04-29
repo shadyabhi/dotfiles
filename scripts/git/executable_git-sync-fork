@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# git sync-fork — fast-forward the personal fork's default branch from origin.
+# No working-tree checkout required. Auto-creates the fork on first use.
+set -euo pipefail
+
+source "$(dirname "$0")/_fork_lib.sh"
+
+ensure_fork
+git fetch --quiet origin
+default=$(default_branch)
+git push "$fork_remote" "refs/remotes/origin/${default}:refs/heads/${default}"
