@@ -21,6 +21,27 @@ vim.opt.rtp:prepend(lazypath)
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 
+vim.opt.number = true
+vim.opt.relativenumber = true
+
+-- ZZ / ZQ exit nvim entirely instead of just the current window.
+vim.keymap.set("n", "ZZ", "<cmd>wqall<cr>", { desc = "Write all and quit nvim" })
+vim.keymap.set("n", "ZQ", "<cmd>qall!<cr>", { desc = "Quit nvim, discard changes" })
+
+-- Detect uv inline-script shebangs (`#!/usr/bin/env -S uv run --script`) as Python.
+vim.filetype.add({
+  pattern = {
+    [".*"] = {
+      function(_, bufnr)
+        local line = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] or ""
+        if line:match("^#!.*uv run") or line:match("^#!.*python") then
+          return "python"
+        end
+      end,
+    },
+  },
+})
+
 -- Setup lazy.nvim
 require("lazy").setup({
   spec = {
