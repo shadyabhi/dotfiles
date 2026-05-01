@@ -44,19 +44,22 @@ function obj:start()
     local switch   = load("switch")
     local absolute = load("absolute")
     local autoclose = load("autoclose")
+    local deskpad = load("deskpad")
 
     spaces.bind(self)
     grid.bind(self)
     switch.bind(self)
     absolute.bind(self)
     autoclose.start(self)
+    deskpad.start(self)
 
-    self._modules = { spaces = spaces, grid = grid, switch = switch, absolute = absolute, autoclose = autoclose }
+    self._modules = { spaces = spaces, grid = grid, switch = switch, absolute = absolute, autoclose = autoclose, deskpad = deskpad }
     return self
 end
 
 function obj:stop()
     if self._modules and self._modules.autoclose then self._modules.autoclose.stop() end
+    if self._modules and self._modules.deskpad then self._modules.deskpad.stop() end
     return self
 end
 
