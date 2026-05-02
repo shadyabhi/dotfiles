@@ -1,0 +1,6 @@
+linux_exclude:
+  paths:
+    - Library/
+    - .hammerspoon/
+    - scripts/macos/
+    - .config/karabiner/
