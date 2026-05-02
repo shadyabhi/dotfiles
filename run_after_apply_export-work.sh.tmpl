@@ -1,0 +1,34 @@
+#!/bin/sh
+# Export chezmoi-managed files from $HOME into the work dotfiles repo
+# working tree, so that repo can stay "plain" (no chezmoi knowledge).
+#
+# excludes-hash: {{ .linux_exclude | toYaml | sha256sum }}
+
+set -eu
+
+DEST="$HOME/coder/abhijeetr/dotfiles"
+if [ ! -d "$DEST/.git" ]; then
+  echo "skip work export: $DEST is not a git repo"
+  exit 0
+fi
+
+EXFILE=$(mktemp)
+FFILE=$(mktemp)
+trap 'rm -f "$EXFILE" "$FFILE"' EXIT
+
+cat > "$EXFILE" <<'EOF'
+{{- range .linux_exclude.paths }}
+{{ . }}
+{{- end }}
+EOF
+
+# All chezmoi-managed files, paths relative to $HOME.
+chezmoi managed --include=files --path-style=relative > "$FFILE"
+
+rsync -a \
+  --files-from="$FFILE" \
+  --exclude-from="$EXFILE" \
+  "$HOME/" "$DEST/"
+
+echo "work export: synced $(wc -l < "$FFILE" | tr -d ' ') candidate files to $DEST (minus excludes)"
+echo "review with: git -C \"$DEST\" status"
