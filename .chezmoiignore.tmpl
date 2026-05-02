@@ -1,6 +1,7 @@
 # .chezmoiignore.tmpl
 # This file allows you to ignore certain files or directories based on templates.
-# Example:
-# {{ if ne .device_type "work" }}
-# .work_only_file
-# {{ end }}
+
+{{- if eq .chezmoi.os "linux" }}
+# cm_sync.sh depends on macOS keychain (`security`) for the Bitwarden session.
+scripts/chezmoi/cm_sync.sh
+{{- end }}
