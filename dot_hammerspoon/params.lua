@@ -25,6 +25,10 @@ return {
         hotkey = { { "cmd", "alt", "ctrl" }, "'" },
     },
 
+    windowKit = {
+        gridChoices = { "2x1", "2x2", "3x1", "3x2" },
+    },
+
     scriptMonitor = {
         audioScreenDelaySec = 2,
         processPollSec      = 5,

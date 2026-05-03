@@ -109,7 +109,11 @@ function M.bind(parent)
         hs.grid.setGrid(choice["text"])
         drawGrid(hs.grid.getGrid(), hs.window.filter.defaultCurrentSpace:getWindows())
     end)
-    chooser:choices({ { text = "2x1\n" }, { text = "3x1\n" }, { text = "3x2\n" } })
+    local choices = {}
+    for _, dims in ipairs(parent.gridChoices or { "2x1", "3x1", "3x2" }) do
+        table.insert(choices, { text = dims .. "\n" })
+    end
+    chooser:choices(choices)
     hk:bind("hca", "g", function() chooser:show() end)
 
     hk:bind("h", "a", function()

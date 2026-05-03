@@ -13,6 +13,7 @@ obj.license = "MIT"
 
 obj.gridDims = "3x2"
 obj.gridMargins = "1x1"
+obj.gridChoices = { "2x1", "3x1", "3x2" }
 obj.hyperkey = nil
 obj.notifyFn = function(_, _, _) end
 obj.alertFn  = function(_, _, _) end
@@ -28,6 +29,7 @@ function obj:configure(opts)
     if opts.alertFn  then self.alertFn  = opts.alertFn end
     if opts.gridDims then self.gridDims = opts.gridDims end
     if opts.gridMargins then self.gridMargins = opts.gridMargins end
+    if opts.gridChoices then self.gridChoices = opts.gridChoices end
     if opts.autoclose then self.autoclose = opts.autoclose end
     if opts.spaces then self.spaces = opts.spaces end
     return self
@@ -44,22 +46,19 @@ function obj:start()
     local switch   = load("switch")
     local absolute = load("absolute")
     local autoclose = load("autoclose")
-    local deskpad = load("deskpad")
 
     spaces.bind(self)
     grid.bind(self)
     switch.bind(self)
     absolute.bind(self)
     autoclose.start(self)
-    deskpad.start(self)
 
-    self._modules = { spaces = spaces, grid = grid, switch = switch, absolute = absolute, autoclose = autoclose, deskpad = deskpad }
+    self._modules = { spaces = spaces, grid = grid, switch = switch, absolute = absolute, autoclose = autoclose }
     return self
 end
 
 function obj:stop()
     if self._modules and self._modules.autoclose then self._modules.autoclose.stop() end
-    if self._modules and self._modules.deskpad then self._modules.deskpad.stop() end
     return self
 end
 

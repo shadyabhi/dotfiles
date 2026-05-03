@@ -49,13 +49,13 @@ spoon.ClaudeSessions
     :start()
 
 hs.loadSpoon("WindowKit")
-spoon.WindowKit
-    :configure({
-        hyperkey = spoon.HyperKey,
-        notifyFn = function(t, s, d) spoon.Notify:info(t, s, d) end,
-        alertFn  = function(t, s, d) spoon.Notify:alert(t, s, d) end,
-    })
-    :start()
+local windowKitOpts = {
+    hyperkey = spoon.HyperKey,
+    notifyFn = function(t, s, d) spoon.Notify:info(t, s, d) end,
+    alertFn  = function(t, s, d) spoon.Notify:alert(t, s, d) end,
+}
+for k, v in pairs(params.windowKit or {}) do windowKitOpts[k] = v end
+spoon.WindowKit:configure(windowKitOpts):start()
 
 hs.allowAppleScript(true)
 require "hs.ipc"
