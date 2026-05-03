@@ -26,6 +26,8 @@ return {
     },
 
     windowKit = {
+        gridDims    = "3x2",
+        gridMargins = "1x1",
         gridChoices = { "2x1", "2x2", "3x1", "3x2" },
     },
 
