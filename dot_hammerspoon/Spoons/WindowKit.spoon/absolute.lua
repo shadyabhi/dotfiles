@@ -28,6 +28,22 @@ local function resizeWidth(delta)
     win:setFrame(f)
 end
 
+local function placeNumbered(n)
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    local screen = win:screen()
+    local g = hs.grid.getGrid(screen)
+    local total = g.w * g.h
+    if n >= 1 and n <= total then
+        local idx = n - 1
+        local row = math.floor(idx / g.w)
+        local col = idx % g.w
+        hs.grid.set(win, { x = col, y = row, w = 1, h = 1 }, screen)
+    elseif n == total + 1 then
+        moveWindow(win, 0.15, 0, 0.7, 1)
+    end
+end
+
 function M.bind(parent)
     hs.window.animationDuration = 0
 
@@ -43,13 +59,11 @@ function M.bind(parent)
     local hk = parent.hyperkey
     hk:bind("hca", "=", function() resizeWidth(1) end)
     hk:bind("hca", "-", function() resizeWidth(-1) end)
-    hk:bind("hca", "1", function() moveWindow(hs.window.focusedWindow(), 0,   0, 1/3, 1) end)
-    hk:bind("hca", "2", function() moveWindow(hs.window.focusedWindow(), 1/3, 0, 1/3, 1) end)
-    hk:bind("hca", "3", function() moveWindow(hs.window.focusedWindow(), 2/3, 0, 1/3, 1) end)
-    hk:bind("hca", "4", function() moveWindow(hs.window.focusedWindow(), 0,   0, 2/3, 1) end)
-    hk:bind("hca", "5", function() moveWindow(hs.window.focusedWindow(), 1/3, 0, 2/3, 1) end)
-    hk:bind("hca", "9", function() moveWindow(hs.window.focusedWindow(), 1/5, 0, 3/5, 1) end)
-    hk:bind("hca", "0", function() moveWindow(hs.window.focusedWindow(), 1/5, 0, 3/5, 2/3) end)
+    for i = 1, 9 do
+        local n = i
+        hk:bind("hca", tostring(i), function() placeNumbered(n) end)
+    end
+    hk:bind("hca", "0", function() placeNumbered(10) end)
 end
 
 return M
