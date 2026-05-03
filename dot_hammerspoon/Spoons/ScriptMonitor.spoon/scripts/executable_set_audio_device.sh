@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# Preferred audio devices (in priority order)
-PREFERRED_OUTPUT=("Bose QC Ultra 2 Earbuds" "Abhijeet's EX" "Abhijeet's Beoplay H100" "DELL U4025QW" "MacBook Pro Speakers")
-PREFERRED_INPUT=("Bose QC Ultra 2 Earbuds" "Insta360 Link 2 Pro" "Abhijeet's EX" "Abhijeet's Beoplay H100" "Avaya HC020" "MacBook Pro Microphone")
+# Preferred devices passed as args, pipe-delimited (priority order):
+#   $1 = output devices, $2 = input devices
+# Example: set_audio_device.sh "Bose|Dell|Speakers" "Bose|Mic"
+IFS='|' read -r -a PREFERRED_OUTPUT <<< "$1"
+IFS='|' read -r -a PREFERRED_INPUT <<< "$2"
 
 AUDIO_SWITCH="/opt/homebrew/bin/SwitchAudioSource"
 

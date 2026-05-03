@@ -1,3 +1,11 @@
+-- Load params with optional per-host override (params.<hostname>.lua).
+local params = dofile(hs.configdir .. "/params.lua")
+local id = hs.execute('printf "%s-%s" "$USER" "$(hostname -s)"'):gsub("%s+$", "")
+local overridePath = hs.configdir .. "/params." .. id .. ".lua"
+if hs.fs.attributes(overridePath) then
+    for k, v in pairs(dofile(overridePath)) do params[k] = v end
+end
+
 -- Auto-install and load upstream spoons
 hs.loadSpoon("SpoonInstall")
 spoon.SpoonInstall:andUse("EmmyLua")
@@ -13,37 +21,31 @@ spoon.HyperKey:start()
 hs.loadSpoon("AppLauncher")
 spoon.AppLauncher.hyperkey = spoon.HyperKey
 spoon.AppLauncher
-    :setApps({
-        { "j", "Emdash Beta" },
-        { "b", "Google Chrome" },
-        { "c", "Google Calendar" },
-        { "e", "Microsoft Edge" },
-        { "g", "Gmail" },
-        { "r", "Reclaim" },
-        { "s", "Slack" },
-        { "t", "iTerm" },
-        { "m", "Google Meet" },
-        { "w", "Obsidian" },
-    })
-    :bindHotkeys({ launchPrefix = "h", chooserPrefix = "hs" })
+    :setApps(params.apps)
+    :bindHotkeys(params.appLauncher)
 
 hs.loadSpoon("ScriptMonitor")
 spoon.ScriptMonitor
     :addEvent({
         on       = { "audioDevice", "screen" },
         script   = spoon.ScriptMonitor:resource("set_audio_device.sh"),
-        delaySec = 2,
+        delaySec = params.scriptMonitor.audioScreenDelaySec,
+        args     = {
+            table.concat(params.audioDevice.preferredOutput, "|"),
+            table.concat(params.audioDevice.preferredInput, "|"),
+        },
     })
     :addPoll({
         script      = spoon.ScriptMonitor:resource("process_monitor.py"),
-        intervalSec = 5,
+        intervalSec = params.scriptMonitor.processPollSec,
+        args        = params.processMonitor.requiredApps,
         onOutput    = function(out) spoon.Notify:alert("Process Monitor", out, 5) end,
     })
     :start()
 
 hs.loadSpoon("ClaudeSessions")
 spoon.ClaudeSessions
-    :configure({ hotkey = { { "cmd", "alt", "ctrl" }, "'" } })
+    :configure({ hotkey = params.claudeSessions.hotkey })
     :start()
 
 hs.loadSpoon("WindowKit")

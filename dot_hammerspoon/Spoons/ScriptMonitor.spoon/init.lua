@@ -22,7 +22,7 @@ local audioWatcherStarted = false
 local screenWatcher = nil
 
 function obj:resource(name)
-    return self.spoonPath .. "scripts/" .. name
+    return hs.spoons.resourcePath("scripts/" .. name)
 end
 
 function obj:addEvent(spec)
@@ -35,16 +35,29 @@ function obj:addPoll(spec)
     return self
 end
 
+local function shellQuote(s)
+    return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+end
+
+local function buildCmd(spec)
+    local cmd = shellQuote(spec.script)
+    for _, a in ipairs(spec.args or {}) do
+        cmd = cmd .. " " .. shellQuote(a)
+    end
+    return cmd
+end
+
 local function fireEvent(spec)
+    local cmd = buildCmd(spec)
     local delay = spec.delaySec or 0
     if delay > 0 then
         hs.timer.doAfter(delay, function()
-            hs.execute(spec.script)
-            log.f("ran %s after %ds", spec.script, delay)
+            hs.execute(cmd)
+            log.f("ran %s after %ds", cmd, delay)
         end)
     else
-        hs.execute(spec.script)
-        log.f("ran %s", spec.script)
+        hs.execute(cmd)
+        log.f("ran %s", cmd)
     end
 end
 
@@ -58,9 +71,8 @@ function obj:start()
     end
 
     if needAudio and not audioWatcherStarted then
-        local audioTriggers = { ["dev#"] = true, ["dIn "] = true, ["dOut"] = true }
         hs.audiodevice.watcher.setCallback(function(event)
-            if not audioTriggers[event] then return end
+            if event ~= "dev#" then return end
             for _, ev in ipairs(events) do
                 for _, src in ipairs(ev.on or {}) do
                     if src == "audioDevice" then fireEvent(ev) end
@@ -86,12 +98,14 @@ function obj:start()
     for _, poll in ipairs(polls) do
         local function tick()
             local interp = poll.interpreter or "/usr/bin/python3"
+            local argv = { poll.script }
+            for _, a in ipairs(poll.args or {}) do table.insert(argv, a) end
             local task = hs.task.new(interp, function(_, stdout, _)
                 if poll.onOutput and stdout then
                     local trimmed = stdout:gsub("%s+$", "")
                     if trimmed ~= "" then poll.onOutput(trimmed) end
                 end
-            end, { poll.script })
+            end, argv)
             if task then task:start() end
         end
         tick()
