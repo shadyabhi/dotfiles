@@ -1,6 +1,25 @@
 -- Default parameters. Override per-machine in `params.<user>-<hostname>.lua`
--- (e.g. params.shadyabhi-macbook-air.lua). Override file returns a partial
--- table; top-level keys present there fully replace the defaults below.
+-- where <user> = $USER and <hostname> = `hostname -s` (see init.lua).
+-- e.g. on host `macbook-air` for user `shadyabhi`, create:
+--      params.shadyabhi-macbook-air.lua
+--
+-- Override file returns a partial table. Top-level keys present in the
+-- override REPLACE the matching default whole — no deep merge. To tweak
+-- one nested field, copy the whole sub-table from below and edit it.
+--
+-- Example override (only changes grid + apps, leaves rest as defaults):
+--
+--     return {
+--         apps = {
+--             { "b", "Firefox" },
+--             { "t", "Ghostty" },
+--         },
+--         windowKit = {
+--             gridDims    = "4x2",
+--             gridMargins = "0x0",
+--             gridChoices = { "2x1", "4x2" },
+--         },
+--     }
 
 return {
     apps = {
