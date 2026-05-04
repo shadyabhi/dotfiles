@@ -48,6 +48,9 @@ spoon.ClaudeSessions
     :configure({ hotkey = params.claudeSessions.hotkey })
     :start()
 
+hs.loadSpoon("CenterNativeNotifications")
+spoon.CenterNativeNotifications:start()
+
 hs.loadSpoon("WindowKit")
 local windowKitOpts = {
     hyperkey = spoon.HyperKey,
