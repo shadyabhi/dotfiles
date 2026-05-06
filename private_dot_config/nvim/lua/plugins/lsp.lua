@@ -26,10 +26,35 @@ return {
       vim.lsp.config("perlnavigator", {
         settings = {
           perlnavigator = {
-            enableWarnings = true,
+            enableWarnings = false,
             perltidyEnabled = true,
             perlcriticEnabled = true,
+            includePaths = {
+              vim.fn.expand("~/perl5/lib/perl5"),
+              "$workspaceFolder/Files/usr/local/ccsc/lib",
+              "$workspaceFolder/lib",
+            },
           },
+        },
+        -- Drop compile-check diagnostics: this codebase pulls in CPAN XS
+        -- modules (Net::Curl::Easy, etc.) that only exist on the appliance,
+        -- so `perl -c` always fails locally. Keep nav features (gd, K, gr).
+        handlers = {
+          ["textDocument/publishDiagnostics"] = function(_, result, ctx, config)
+            if result and result.diagnostics then
+              local filtered = {}
+              for _, d in ipairs(result.diagnostics) do
+                local msg = d.message or ""
+                if not (msg:match("Can't locate")
+                    or msg:match("BEGIN failed")
+                    or msg:match("compilation aborted")) then
+                  table.insert(filtered, d)
+                end
+              end
+              result.diagnostics = filtered
+            end
+            vim.lsp.diagnostic.on_publish_diagnostics(_, result, ctx, config)
+          end,
         },
       })
 
