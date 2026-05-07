@@ -22,7 +22,7 @@ local audioWatcherStarted = false
 local screenWatcher = nil
 
 function obj:resource(name)
-    return hs.spoons.resourcePath("scripts/" .. name)
+    return self.spoonPath .. "scripts/" .. name
 end
 
 function obj:addEvent(spec)
@@ -113,6 +113,15 @@ function obj:start()
         table.insert(self._pollTimers, t)
     end
 
+    return self
+end
+
+function obj:fire(source)
+    for _, ev in ipairs(events) do
+        for _, src in ipairs(ev.on or {}) do
+            if src == source then fireEvent(ev) end
+        end
+    end
     return self
 end
 
