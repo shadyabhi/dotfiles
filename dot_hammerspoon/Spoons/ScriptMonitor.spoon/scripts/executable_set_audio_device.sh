@@ -17,9 +17,11 @@ set_audio_device() {
     available_devices=$($AUDIO_SWITCH -a -t "$type")
 
     for device in "${preferred_list[@]}"; do
-        if echo "$available_devices" | grep -Fq "$device"; then
-            $AUDIO_SWITCH -t "$type" -s "$device" > /dev/null
-            echo "$device"
+        local matched
+        matched=$(echo "$available_devices" | grep -F -m1 "$device")
+        if [ -n "$matched" ]; then
+            $AUDIO_SWITCH -t "$type" -s "$matched" > /dev/null
+            echo "$matched"
             return 0
         fi
     done
