@@ -40,6 +40,21 @@ local function file_exists(path)
     return false
 end
 
+local function activeScreen()
+    local fw = hs.window.focusedWindow()
+    return (fw and fw:screen()) or hs.screen.mainScreen()
+end
+
+local function windowsOnActiveScreen(app)
+    local screenId = activeScreen():getUUID()
+    local windows = app and app:allWindows() or {}
+    return hs.fnutils.filter(windows, function(w)
+        if not (w:isStandard() and w:id() ~= nil) then return false end
+        local s = w:screen()
+        return s and s:getUUID() == screenId
+    end)
+end
+
 local function launchAndCenter(self, path)
     hs.application.launchOrFocus(path)
     hs.timer.doAfter(0.3, function() self.mouse.toCenter() end)
@@ -47,6 +62,15 @@ end
 
 local function launchApp(self, name)
     return function()
+        local app = hs.application.find(name)
+        if app then
+            local windows = windowsOnActiveScreen(app)
+            if #windows > 0 then
+                windows[1]:focus()
+                hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+                return
+            end
+        end
         for _, base in ipairs(self.searchPaths) do
             local path = base .. "/" .. name .. ".app"
             if file_exists(path) then
@@ -60,10 +84,7 @@ end
 local function launchAppChooser(self, name)
     return function()
         local app = hs.application.find(name)
-        local windows = app and app:allWindows() or {}
-        windows = hs.fnutils.filter(windows, function(w)
-            return w:isStandard() and w:id() ~= nil
-        end)
+        local windows = windowsOnActiveScreen(app)
 
         if #windows == 0 then launchApp(self, name)(); return end
         if #windows == 1 then
