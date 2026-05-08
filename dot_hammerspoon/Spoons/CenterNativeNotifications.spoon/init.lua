@@ -29,6 +29,12 @@ obj.appWatcher = nil
 obj.watchedWindowKeys = {}
 obj.originalOrigins = {}
 
+--- CenterNativeNotifications.followMouse
+--- Variable
+--- When true, banners are centered on the screen containing the mouse cursor.
+--- When false, banners are centered on the screen they currently appear on.
+obj.followMouse = true
+
 local function safeAttr(el, name)
     if not el then return nil end
     local ok, v = pcall(function() return el:attributeValue(name) end)
@@ -112,7 +118,12 @@ function obj:moveWindow(win)
     local wPos = safeAttr(win, "AXPosition")
     if not (bPos and bSize and wPos) then return end
 
-    local screen = screenForCenter(bPos.x + bSize.w / 2, bPos.y + bSize.h / 2)
+    local screen
+    if self.followMouse then
+        screen = hs.mouse.getCurrentScreen() or screenForCenter(bPos.x + bSize.w / 2, bPos.y + bSize.h / 2)
+    else
+        screen = screenForCenter(bPos.x + bSize.w / 2, bPos.y + bSize.h / 2)
+    end
     local sf = screen:frame()
     local desiredX = sf.x + (sf.w - bSize.w) / 2
     local desiredY = sf.y + (sf.h - bSize.h) / 2
