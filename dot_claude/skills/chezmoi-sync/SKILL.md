@@ -61,7 +61,7 @@ git pull --rebase
 git push
 ```
 
-This mirrors what `cm_sync.sh` does, but with a non-interactive commit message. Note that `cm_sync.sh` additionally mirrors the same commit into the work dotfiles repo at `~/coder/abhijeetr/dotfiles` (populated via `run_after_apply_export-work.sh.tmpl` on `chezmoi apply`); replicate that mirror step if the user expects both repos to stay in sync.
+This mirrors the push portion of `cm_sync.sh`, but with a non-interactive commit message. `cm_sync.sh` additionally runs `chezmoi apply` after pushing, which triggers `run_after_apply_export-work.sh.tmpl` to populate the work dotfiles repo at `~/coder/abhijeetr/dotfiles`; this skill skips the apply step.
 
 ### Step 5: Confirm
 
