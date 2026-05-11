@@ -65,8 +65,17 @@ local function launchApp(self, name)
         local app = hs.application.find(name)
         if app then
             local windows = windowsOnActiveScreen(app)
+            -- Stable order so successive presses cycle deterministically.
+            table.sort(windows, function(a, b) return a:id() < b:id() end)
             if #windows > 0 then
-                windows[1]:focus()
+                local focused = hs.window.focusedWindow()
+                local curId = focused and focused:id()
+                local idx = 0
+                for i, w in ipairs(windows) do
+                    if w:id() == curId then idx = i; break end
+                end
+                local next = windows[(idx % #windows) + 1]
+                next:focus()
                 hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
                 return
             end
