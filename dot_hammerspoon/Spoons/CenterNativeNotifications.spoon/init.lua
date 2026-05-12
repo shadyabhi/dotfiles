@@ -26,6 +26,7 @@ obj.app = nil
 obj.appElement = nil
 obj.observer = nil
 obj.appWatcher = nil
+obj.screenWatcher = nil
 obj.watchedWindowKeys = {}
 obj.originalOrigins = {}
 
@@ -232,6 +233,12 @@ function obj:start()
     end)
     self.appWatcher:start()
 
+    self.screenWatcher = hs.screen.watcher.new(function()
+        self:teardownObserver()
+        self:setupObserver()
+    end)
+    self.screenWatcher:start()
+
     return self
 end
 
@@ -240,6 +247,10 @@ function obj:stop()
     if self.appWatcher then
         self.appWatcher:stop()
         self.appWatcher = nil
+    end
+    if self.screenWatcher then
+        self.screenWatcher:stop()
+        self.screenWatcher = nil
     end
     return self
 end
