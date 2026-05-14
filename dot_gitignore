@@ -15,5 +15,8 @@
 *.crt # Not sensitive, but disable
 *.key
 
+# Environment
+.envrc
+
 # Claude
 .claude/settings.local.json
