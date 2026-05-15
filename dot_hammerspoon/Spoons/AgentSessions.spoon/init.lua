@@ -1,12 +1,12 @@
---- === ClaudeSessions ===
+--- === AgentSessions ===
 ---
---- Menubar widget for Claude/Codex session status. Polls a JSON-emitting script.
+--- Menubar widget for agent session status. Polls a JSON-emitting script.
 --- Click menubar (or hotkey) opens chooser; selecting a session focuses its tmux pane in iTerm.
 
 local obj = {}
 obj.__index = obj
 
-obj.name = "ClaudeSessions"
+obj.name = "AgentSessions"
 obj.version = "1.0"
 obj.author = "Abhijeet Rastogi"
 obj.license = "MIT"
@@ -45,8 +45,9 @@ function obj:configure(opts)
 end
 
 local function teardown_prior()
-    if _G._claude_sessions_state then
-        local s = _G._claude_sessions_state
+    local prior = _G._agent_sessions_state or _G._claude_sessions_state
+    if prior then
+        local s = prior
         if s.timer then s.timer:stop() end
         if s.blink_timer then s.blink_timer:stop() end
         if s.age_tick then s.age_tick:stop() end
@@ -56,6 +57,8 @@ local function teardown_prior()
         if s.hotkey then s.hotkey:delete() end
         if s.caffeinate then pcall(function() s.caffeinate:terminate() end) end
     end
+    _G._agent_sessions_state = nil
+    _G._claude_sessions_state = nil
 end
 
 local function caffeinate_set(state, want)
@@ -64,8 +67,8 @@ local function caffeinate_set(state, want)
     end
     if want and not state.caffeinate then
         local t = hs.task.new("/usr/bin/caffeinate", function()
-            if _G._claude_sessions_state then
-                _G._claude_sessions_state.caffeinate = nil
+            if _G._agent_sessions_state then
+                _G._agent_sessions_state.caffeinate = nil
             end
         end, { "-di" })
         if t then t:start(); state.caffeinate = t end
@@ -92,7 +95,7 @@ function obj:start()
 
     teardown_prior()
     state = {}
-    _G._claude_sessions_state = state
+    _G._agent_sessions_state = state
 
     local theme = self.theme
     local in_flight, in_flight_started = nil, 0
@@ -164,7 +167,7 @@ function obj:start()
         for _, s in ipairs(waiting_sessions) do
             local cwd = shorten_cwd(s.cwd)
             local age = fmt_ago(s.started_at)
-            local agent = s.agent or "Claude"
+            local agent = s.agent or "Agent"
             lines[#lines+1] = agent .. "  ·  " .. cwd .. "  ·  started " .. age
             key_parts[#key_parts+1] = agent .. ":" .. (s.session_id or s.cwd or "?") .. "@" .. tostring(s.started_at or 0)
         end
@@ -178,7 +181,7 @@ function obj:start()
         end
 
         if not (spoon and spoon.Notify and spoon.Notify.banner) then
-            hs.printf("[ClaudeSessions] Notify spoon not loaded; skipping banner")
+            hs.printf("[AgentSessions] Notify spoon not loaded; skipping banner")
             return
         end
 
@@ -233,7 +236,7 @@ function obj:start()
         local choices = {}
         for _, s in ipairs(last_sessions) do
             local icon = theme.statusIcon[s.status] or "❓"
-            local agent = s.agent or "Claude"
+            local agent = s.agent or "Agent"
             local label = agent .. " · " .. (s.project_name or "?")
             if s.session_name then
                 label = label .. " · " .. s.session_name

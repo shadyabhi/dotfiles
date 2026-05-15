@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit JSON describing Claude and Codex sessions.
+"""Emit JSON describing local AI agent sessions.
 
 Output:
     { "summary": "🔔0 🤔1 💤2",
