@@ -67,7 +67,7 @@ return {
             "Lumesent",
             "Shottr",
             "BetterDisplay",
-            "MacWhisper",
+            "FluidVoice",
             "Alfred",
         },
     },
