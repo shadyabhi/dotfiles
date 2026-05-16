@@ -55,6 +55,13 @@ return {
         processPollSec      = 5,
     },
 
+    uptimeReminder = {
+        thresholdDays    = 7,
+        hourThreshold    = 17,
+        checkIntervalSec = 30 * 60,
+        snoozeSec        = 2 * 60 * 60,
+    },
+
     processMonitor = {
         requiredApps = {
             "Lumesent",

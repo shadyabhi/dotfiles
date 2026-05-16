@@ -51,6 +51,17 @@ spoon.ClaudeSessions
 hs.loadSpoon("CenterNativeNotifications")
 spoon.CenterNativeNotifications:start()
 
+hs.loadSpoon("UptimeReminder")
+spoon.UptimeReminder
+    :configure({
+        notify           = spoon.Notify,
+        thresholdDays    = params.uptimeReminder.thresholdDays,
+        hourThreshold    = params.uptimeReminder.hourThreshold,
+        checkIntervalSec = params.uptimeReminder.checkIntervalSec,
+        snoozeSec        = params.uptimeReminder.snoozeSec,
+    })
+    :start()
+
 hs.loadSpoon("WindowKit")
 local windowKitOpts = {
     hyperkey = spoon.HyperKey,
