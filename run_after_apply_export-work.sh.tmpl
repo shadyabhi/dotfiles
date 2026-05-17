@@ -1,3 +1,4 @@
+{{- if eq .device_type "work" -}}
 #!/bin/sh
 # Export chezmoi-managed files from $HOME into the work dotfiles repo
 # working tree, so that repo can stay "plain" (no chezmoi knowledge).
@@ -32,3 +33,4 @@ rsync -a \
 
 echo "work export: synced $(wc -l < "$FFILE" | tr -d ' ') candidate files to $DEST (minus excludes)"
 echo "review with: git -C \"$DEST\" status"
+{{- end -}}
