@@ -26,7 +26,6 @@ function M.toCenter(win)
     if not win then return end
     local f = win:frame()
     hs.mouse.absolutePosition({ x = f.x + f.w / 2, y = f.y + f.h / 2 })
-    M.highlight()
 end
 
 return M
