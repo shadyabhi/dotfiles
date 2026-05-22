@@ -6,3 +6,7 @@
 
 #zmodule agnoster
 zmodule joke/zim-starship
+
+# Auto-activate Python virtualenvs when entering a directory with .venv/venv
+# https://github.com/MichaelAquilina/zsh-autoswitch-virtualenv
+zmodule MichaelAquilina/zsh-autoswitch-virtualenv
