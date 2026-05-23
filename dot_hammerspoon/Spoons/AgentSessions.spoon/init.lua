@@ -1,7 +1,8 @@
 --- === AgentSessions ===
 ---
 --- Menubar widget for agent session status. Polls a JSON-emitting script.
---- Click menubar (or hotkey) opens chooser; selecting a session focuses its tmux pane in iTerm.
+--- Menubar click opens chooser; hotkey toggles canvas panel; panel auto-shows
+--- when any session needs user input. Selecting a row focuses its tmux pane.
 
 local obj = {}
 obj.__index = obj
@@ -23,9 +24,7 @@ obj.tmuxSocket = "/private/tmp/tmux-" .. UID .. "/default"
 obj.hotkey = nil
 
 obj.theme = {
-    bannerW       = 520,
-    bannerYFrac   = 0.10,
-    statusIcon    = { Input = "🔔", Working = "🤔", Idle = "💤" },
+    statusIcon = { Input = "🔔", Working = "🤔", Idle = "💤" },
 }
 
 local state = {}
@@ -50,12 +49,12 @@ local function teardown_prior()
         local s = prior
         if s.timer then s.timer:stop() end
         if s.blink_timer then s.blink_timer:stop() end
-        if s.age_tick then s.age_tick:stop() end
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
-        if s.banner then s.banner:hide() end
         if s.hotkey then s.hotkey:delete() end
-        if s.panel_esc then s.panel_esc:delete() end
+        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+            if s[k] then s[k]:delete() end
+        end
         if s.panel then s.panel:delete() end
         if s.caffeinate then pcall(function() s.caffeinate:terminate() end) end
     end
@@ -106,9 +105,9 @@ function obj:start()
     bar:setTitle("…")
     state.bar = bar
 
-    local banner, banner_key = nil, ""
     local last_summary, last_blocked = "", 0
     local blink_on, last_sessions = true, {}
+    local panel_auto_shown, dismissed_waiting_key, last_waiting_key = false, nil, ""
 
     local function render_title()
         if last_blocked == 0 then
@@ -151,62 +150,15 @@ function obj:start()
         return string.format("%dh%02dm ago", hrs, mins % 60)
     end
 
-    local function shorten_cwd(cwd)
-        if not cwd then return "?" end
-        local home = os.getenv("HOME") or ""
-        if home ~= "" and cwd:sub(1, #home) == home then
-            return "~" .. cwd:sub(#home + 1)
-        end
-        return cwd
-    end
-
-    local last_waiting = {}
-
-    local function update_banner(waiting_sessions)
-        last_waiting = waiting_sessions
-        local n = #waiting_sessions
-        local lines, key_parts = {}, {}
+    local function waiting_key_for(waiting_sessions)
+        local parts = {}
         for _, s in ipairs(waiting_sessions) do
-            local cwd = shorten_cwd(s.cwd)
-            local age = fmt_ago(s.started_at)
-            local agent = s.agent or "Agent"
-            lines[#lines+1] = agent .. "  ·  " .. cwd .. "  ·  started " .. age
-            key_parts[#key_parts+1] = agent .. ":" .. (s.session_id or s.cwd or "?") .. "@" .. tostring(s.started_at or 0)
+            parts[#parts+1] = (s.agent or "?") .. ":" .. (s.session_id or s.cwd or "?") .. "@" .. tostring(s.started_at or 0)
         end
-        local key = table.concat(key_parts, "|")
-        if key == banner_key then return end
-        banner_key = key
-
-        if n == 0 then
-            if banner then banner:hide(); banner = nil; state.banner = nil end
-            return
-        end
-
-        if not (spoon and spoon.Notify and spoon.Notify.banner) then
-            hs.printf("[AgentSessions] Notify spoon not loaded; skipping banner")
-            return
-        end
-
-        local clickTargets = {}
-        for i, s in ipairs(waiting_sessions) do clickTargets[i] = s.pane_target end
-        local opts = {
-            level     = "alert",
-            title     = "✴️ " .. n .. " waiting",
-            lines     = lines,
-            width     = theme.bannerW,
-            yFraction = theme.bannerYFrac,
-            onClick   = function(_, idx)
-                local pane = clickTargets[idx]
-                if pane then focus_pane(pane) end
-            end,
-        }
-        if banner then
-            banner:update(opts)
-        else
-            banner = spoon.Notify:banner(opts)
-        end
-        state.banner = banner
+        return table.concat(parts, "|")
     end
+
+    local maybe_auto_panel  -- forward decl, defined after show_panel
 
     local function apply_data(data)
         local sessions = data.details
@@ -223,9 +175,9 @@ function obj:start()
         last_blocked = waiting
         render_title()
         bar:setTooltip(#sessions .. " session(s) · " .. waiting .. " waiting")
-        update_banner(waiting_sessions)
         caffeinate_set(state, working > 0)
         last_sessions = sessions
+        if maybe_auto_panel then maybe_auto_panel(waiting_sessions) end
     end
 
     local chooser = hs.chooser.new(function(choice)
@@ -263,17 +215,35 @@ function obj:start()
     bar:setClickCallback(function() show_chooser() end)
 
     local panel = nil
+    local panel_origin = nil
 
-    local function hide_panel()
+    local function hide_panel(reason)
         for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
             if state[k] then state[k]:delete(); state[k] = nil end
         end
-        if panel then panel:delete(); panel = nil; state.panel = nil end
+        if panel then
+            local ok, tl = pcall(function() return panel:topLeft() end)
+            if ok and tl then panel_origin = tl end
+            panel:delete(); panel = nil; state.panel = nil
+        end
+        if reason == "user_dismiss" then
+            dismissed_waiting_key = last_waiting_key
+        end
+        panel_auto_shown = false
     end
     state.hide_panel = hide_panel
 
-    local function show_panel()
-        hide_panel()
+    local function show_panel(was_auto)
+        local prev = panel
+        local prev_tl = nil
+        if prev then
+            local ok, tl = pcall(function() return prev:topLeft() end)
+            if ok and tl then prev_tl = tl end
+        end
+        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+            if state[k] then state[k]:delete(); state[k] = nil end
+        end
+        if prev then prev:delete(); panel = nil; state.panel = nil end
 
         local order = { "Input", "Working", "Idle" }
         local headers = {
@@ -313,6 +283,8 @@ function obj:start()
         local sf = hs.screen.mainScreen():frame()
         local x = sf.x + (sf.w - W) / 2
         local y = sf.y + sf.h * 0.15
+        if prev_tl then x, y = prev_tl.x, prev_tl.y
+        elseif panel_origin then x, y = panel_origin.x, panel_origin.y end
         local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
@@ -453,14 +425,15 @@ function obj:start()
                     activate()
                 end
             elseif elemId == "bg" and evt == "mouseDown" then
-                hide_panel()
+                hide_panel("user_dismiss")
             end
         end)
 
         c:show()
         panel = c
         state.panel = c
-        state.panel_esc       = hs.hotkey.bind({}, "escape", hide_panel)
+        panel_auto_shown = was_auto and true or false
+        state.panel_esc       = hs.hotkey.bind({}, "escape", function() hide_panel("user_dismiss") end)
         state.panel_up        = hs.hotkey.bind({}, "up",     function() set_selected(selected - 1) end)
         state.panel_down      = hs.hotkey.bind({}, "down",   function() set_selected(selected + 1) end)
         state.panel_enter     = hs.hotkey.bind({}, "return", activate)
@@ -469,9 +442,31 @@ function obj:start()
     end
 
     local function toggle_panel()
-        if panel then hide_panel() else show_panel() end
+        if panel then
+            hide_panel("user_dismiss")
+        else
+            dismissed_waiting_key = nil
+            show_panel(false)
+        end
     end
     state.toggle_panel = toggle_panel
+
+    maybe_auto_panel = function(waiting_sessions)
+        local key = waiting_key_for(waiting_sessions)
+        local prev_key = last_waiting_key
+        last_waiting_key = key
+        if #waiting_sessions == 0 then
+            if panel and panel_auto_shown then hide_panel() end
+            dismissed_waiting_key = nil
+            return
+        end
+        if panel then
+            if key ~= prev_key then show_panel(panel_auto_shown) end
+            return
+        end
+        if key == dismissed_waiting_key then return end
+        show_panel(true)
+    end
 
     local function refresh()
         if in_flight then
@@ -515,14 +510,6 @@ function obj:start()
         end
     end)
     state.blink_timer = blink_timer
-
-    local age_tick = hs.timer.doEvery(30, function()
-        if banner and #last_waiting > 0 then
-            banner_key = nil
-            update_banner(last_waiting)
-        end
-    end)
-    state.age_tick = age_tick
 
     refresh()
 
