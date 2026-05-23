@@ -1,6 +1,6 @@
 ---
 name: chezmoi-sync
-description: Syncs edited dotfiles to chezmoi and pushes changes with a descriptive commit message. Only trigger when invoked explicitly via /chezmoi-sync. Do NOT trigger automatically or from conversational mentions.
+description: Syncs edited dotfiles to chezmoi and pushes changes with a descriptive commit message. Only trigger when explicitly requested by name or via /chezmoi-sync. Do NOT trigger automatically from conversational mentions.
 ---
 
 # Chezmoi Sync

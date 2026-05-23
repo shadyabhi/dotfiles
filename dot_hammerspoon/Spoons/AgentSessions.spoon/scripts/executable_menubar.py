@@ -265,10 +265,22 @@ def codex_rows() -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def codex_turn_state(rollout_path: str | None) -> tuple[bool, int | None]:
+def preview_text(value: str | None, limit: int = 220) -> str | None:
+    if not value:
+        return None
+    value = re.sub(r"\s+", " ", value).strip()
+    if not value:
+        return None
+    if len(value) > limit:
+        value = value[:limit - 3] + "..."
+    return value
+
+
+def codex_turn_state(rollout_path: str | None) -> tuple[bool, int | None, str | None]:
     latest_started: str | None = None
     latest_started_at: int | None = None
     completed: set[str] = set()
+    last_user_message: str | None = None
 
     for event in load_jsonl(rollout_path or ""):
         ts = epoch_ms_from_iso(event.get("timestamp"))
@@ -282,8 +294,14 @@ def codex_turn_state(rollout_path: str | None) -> tuple[bool, int | None]:
             latest_started_at = ts
         elif typ == "task_complete" and turn_id:
             completed.add(turn_id)
+        elif typ == "user_message":
+            last_user_message = payload.get("message")
 
-    return bool(latest_started and latest_started not in completed), latest_started_at
+    return (
+        bool(latest_started and latest_started not in completed),
+        latest_started_at,
+        preview_text(last_user_message),
+    )
 
 
 def codex_live_panes(rows: list[dict], panes: list[TmuxPane], commands: dict[int, str], children: dict[int, list[int]]) -> dict[str, str]:
@@ -317,13 +335,13 @@ def collect_codex(panes: list[TmuxPane], commands: dict[int, str], children: dic
     for row in rows:
         thread_id = row.get("id")
         pane_target = live_panes.get(thread_id)
-        running, started_at = codex_turn_state(row.get("rollout_path"))
+        running, started_at, prompt_preview = codex_turn_state(row.get("rollout_path"))
         if not pane_target:
             status = "Idle"
         elif running:
             status = "Working"
         else:
-            status = "Input"
+            status = "Idle"
 
         cwd = row.get("cwd")
         title = row.get("title") or row.get("agent_nickname") or thread_id
@@ -343,6 +361,7 @@ def collect_codex(panes: list[TmuxPane], commands: dict[int, str], children: dic
             "context_display": context,
             "started_at": started_at or epoch_ms(row.get("created_at")),
             "updated_at": epoch_ms(row.get("updated_at")),
+            "prompt_preview": prompt_preview,
         })
     return details
 
@@ -371,10 +390,7 @@ def waiting_preview(target: str | None) -> str | None:
         return None
     tail = cleaned[-5:]
     joined = "  ·  ".join(tail)
-    joined = re.sub(r"\s+", " ", joined)
-    if len(joined) > 220:
-        joined = joined[:217] + "..."
-    return joined
+    return preview_text(joined)
 
 
 def build_payload() -> dict:
@@ -396,7 +412,7 @@ def build_payload() -> dict:
         -(s.get("updated_at") or 0),
     ))
     for d in details:
-        if d.get("status") == "Input":
+        if d.get("status") == "Input" and not d.get("prompt_preview"):
             d["prompt_preview"] = waiting_preview(d.get("pane_target"))
     blocked = sum(1 for s in details if s["status"] == "Input")
     running = sum(1 for s in details if s["status"] == "Working")
