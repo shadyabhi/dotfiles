@@ -55,6 +55,8 @@ local function teardown_prior()
         if s.bar then s.bar:delete() end
         if s.banner then s.banner:hide() end
         if s.hotkey then s.hotkey:delete() end
+        if s.panel_esc then s.panel_esc:delete() end
+        if s.panel then s.panel:delete() end
         if s.caffeinate then pcall(function() s.caffeinate:terminate() end) end
     end
     _G._agent_sessions_state = nil
@@ -260,6 +262,217 @@ function obj:start()
 
     bar:setClickCallback(function() show_chooser() end)
 
+    local panel = nil
+
+    local function hide_panel()
+        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+            if state[k] then state[k]:delete(); state[k] = nil end
+        end
+        if panel then panel:delete(); panel = nil; state.panel = nil end
+    end
+    state.hide_panel = hide_panel
+
+    local function show_panel()
+        hide_panel()
+
+        local order = { "Input", "Working", "Idle" }
+        local headers = {
+            Input   = { icon = "🔔", label = "Waiting for input", color = { red = 1.00, green = 0.55, blue = 0.30, alpha = 1 } },
+            Working = { icon = "🤔", label = "Working",           color = { red = 0.45, green = 0.75, blue = 1.00, alpha = 1 } },
+            Idle    = { icon = "💤", label = "Idle",              color = { white = 0.70, alpha = 1 } },
+        }
+        local groups = { Input = {}, Working = {}, Idle = {} }
+        for _, s in ipairs(last_sessions) do
+            local g = groups[s.status]
+            if g then g[#g + 1] = s else groups.Idle[#groups.Idle + 1] = s end
+        end
+        local function age_key(s) return tonumber(s.started_at) or 0 end
+        for _, k in ipairs(order) do
+            table.sort(groups[k], function(a, b) return age_key(a) > age_key(b) end)
+        end
+
+        local pad, rowH, headerH, sectionGap, previewH = 16, 30, 28, 8, 22
+        local W = 760
+        local function has_preview(s)
+            return s.status == "Input" and s.prompt_preview and s.prompt_preview ~= ""
+        end
+        local visible = {}
+        local H = pad
+        for _, k in ipairs(order) do
+            if #groups[k] > 0 then
+                visible[#visible + 1] = k
+                H = H + headerH + sectionGap
+                for _, s in ipairs(groups[k]) do
+                    H = H + rowH + (has_preview(s) and previewH or 0)
+                end
+            end
+        end
+        if #visible == 0 then H = H + headerH end
+        H = H + pad
+
+        local sf = hs.screen.mainScreen():frame()
+        local x = sf.x + (sf.w - W) / 2
+        local y = sf.y + sf.h * 0.15
+        local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
+        c:level(hs.canvas.windowLevels.overlay)
+        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
+
+        c[1] = {
+            type = "rectangle",
+            id = "bg",
+            trackMouseDown = true,
+            roundedRectRadii = { xRadius = 10, yRadius = 10 },
+            fillColor = { red = 0.10, green = 0.10, blue = 0.12, alpha = 0.96 },
+            strokeColor = { red = 0.25, green = 0.25, blue = 0.28, alpha = 0.6 },
+            strokeWidth = 0.5,
+        }
+
+        local rowPane, rowHiIdx = {}, {}
+        local cursorY = pad
+
+        if #visible == 0 then
+            c[#c + 1] = {
+                type = "text",
+                text = "No active sessions",
+                textColor = { white = 0.65 },
+                textSize = 16,
+                textFont = "Menlo",
+                frame = { x = pad, y = cursorY + 4, w = W - 2 * pad, h = headerH },
+            }
+        end
+
+        for _, k in ipairs(visible) do
+            local hdr = headers[k]
+            local list = groups[k]
+            c[#c + 1] = {
+                type = "text",
+                text = hdr.icon .. "  " .. hdr.label .. "  (" .. #list .. ")",
+                textColor = hdr.color,
+                textSize = 14,
+                textFont = "Menlo-Bold",
+                frame = { x = pad, y = cursorY + 4, w = W - 2 * pad, h = headerH },
+            }
+            cursorY = cursorY + headerH
+            for _, s in ipairs(list) do
+                local rowIdx = #rowPane + 1
+                rowPane[rowIdx] = s.pane_target
+                local thisH = rowH + (has_preview(s) and previewH or 0)
+                local hi = #c + 1
+                c[hi] = {
+                    type = "rectangle",
+                    id = "row_" .. rowIdx,
+                    action = "fill",
+                    trackMouseDown = true,
+                    trackMouseEnterExit = true,
+                    frame = { x = pad - 6, y = cursorY, w = W - 2 * (pad - 6), h = thisH },
+                    roundedRectRadii = { xRadius = 6, yRadius = 6 },
+                    fillColor = { white = 1, alpha = 0 },
+                    strokeWidth = 0,
+                }
+                rowHiIdx[rowIdx] = hi
+
+                local agent = s.agent or "Agent"
+                local proj  = s.project_name or "?"
+                local name  = s.session_name or s.room_id or ""
+                local left  = "  " .. agent .. " · " .. proj
+                if name ~= "" then left = left .. " · " .. name end
+                local right = (s.model_display or "?") .. " · " .. (s.context_display or "?") .. " · " .. fmt_ago(s.started_at) .. "  "
+
+                c[#c + 1] = {
+                    type = "text",
+                    id = "rowL_" .. rowIdx,
+                    trackMouseDown = true,
+                    trackMouseEnterExit = true,
+                    text = left,
+                    textColor = { white = 0.92 },
+                    textSize = 14,
+                    textFont = "Menlo",
+                    frame = { x = pad, y = cursorY + 6, w = W * 0.55, h = rowH - 8 },
+                }
+                c[#c + 1] = {
+                    type = "text",
+                    id = "rowR_" .. rowIdx,
+                    trackMouseDown = true,
+                    trackMouseEnterExit = true,
+                    text = right,
+                    textColor = { white = 0.60 },
+                    textSize = 13,
+                    textFont = "Menlo",
+                    textAlignment = "right",
+                    frame = { x = W * 0.55, y = cursorY + 7, w = W * 0.45 - pad, h = rowH - 8 },
+                }
+                if has_preview(s) then
+                    c[#c + 1] = {
+                        type = "text",
+                        id = "rowP_" .. rowIdx,
+                        trackMouseDown = true,
+                        trackMouseEnterExit = true,
+                        text = "  ↳ " .. s.prompt_preview,
+                        textColor = { red = 1.00, green = 0.80, blue = 0.55, alpha = 0.85 },
+                        textSize = 12,
+                        textFont = "Menlo",
+                        frame = { x = pad + 4, y = cursorY + rowH - 2, w = W - 2 * pad - 4, h = previewH },
+                    }
+                end
+                cursorY = cursorY + thisH
+            end
+            cursorY = cursorY + sectionGap
+        end
+
+        local total = #rowPane
+        local selected = total > 0 and 1 or 0
+
+        local function paint(i, on)
+            local hi = rowHiIdx[i]
+            if not hi then return end
+            c[hi].fillColor = on and { white = 1, alpha = 0.16 } or { white = 1, alpha = 0 }
+        end
+        local function set_selected(i)
+            if i < 1 or i > total or i == selected then return end
+            paint(selected, false)
+            selected = i
+            paint(selected, true)
+        end
+        paint(selected, true)
+
+        local function activate()
+            if selected < 1 then hide_panel(); return end
+            local pane = rowPane[selected]
+            hide_panel()
+            if pane then focus_pane(pane) end
+        end
+
+        c:mouseCallback(function(_, evt, elemId)
+            if type(elemId) ~= "string" then return end
+            local idx = tonumber(elemId:match("^row[LRP]?_(%d+)$"))
+            if idx then
+                if evt == "mouseEnter" then
+                    set_selected(idx)
+                elseif evt == "mouseDown" then
+                    set_selected(idx)
+                    activate()
+                end
+            elseif elemId == "bg" and evt == "mouseDown" then
+                hide_panel()
+            end
+        end)
+
+        c:show()
+        panel = c
+        state.panel = c
+        state.panel_esc       = hs.hotkey.bind({}, "escape", hide_panel)
+        state.panel_up        = hs.hotkey.bind({}, "up",     function() set_selected(selected - 1) end)
+        state.panel_down      = hs.hotkey.bind({}, "down",   function() set_selected(selected + 1) end)
+        state.panel_enter     = hs.hotkey.bind({}, "return", activate)
+        state.panel_tab       = hs.hotkey.bind({}, "tab",    function() set_selected(selected % math.max(1, total) + 1) end)
+        state.panel_shifttab  = hs.hotkey.bind({ "shift" }, "tab", function() set_selected((selected - 2) % math.max(1, total) + 1) end)
+    end
+
+    local function toggle_panel()
+        if panel then hide_panel() else show_panel() end
+    end
+    state.toggle_panel = toggle_panel
+
     local function refresh()
         if in_flight then
             if hs.timer.secondsSinceEpoch() - in_flight_started > self.fetchTimeoutSec then
@@ -314,7 +527,7 @@ function obj:start()
     refresh()
 
     if self.hotkey then
-        state.hotkey = hs.hotkey.bind(self.hotkey[1], self.hotkey[2], show_chooser)
+        state.hotkey = hs.hotkey.bind(self.hotkey[1], self.hotkey[2], toggle_panel)
     end
 
     return self

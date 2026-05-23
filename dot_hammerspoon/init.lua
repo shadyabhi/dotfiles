@@ -43,9 +43,9 @@ spoon.ScriptMonitor
     })
     :start()
 
-hs.loadSpoon("ClaudeSessions")
-spoon.ClaudeSessions
-    :configure({ hotkey = params.claudeSessions.hotkey })
+hs.loadSpoon("AgentSessions")
+spoon.AgentSessions
+    :configure({ hotkey = params.agentSessions.hotkey })
     :start()
 
 hs.loadSpoon("CenterNativeNotifications")

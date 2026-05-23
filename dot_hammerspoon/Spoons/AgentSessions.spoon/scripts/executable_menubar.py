@@ -36,6 +36,8 @@ CODEX_STATE_DB = os.environ.get("CODEX_STATE_DB", os.path.join(CODEX_HOME, "stat
 SOCKET = f"/private/tmp/tmux-{os.getuid()}/default"
 TMUX_BIN = os.environ.get("TMUX_BIN", "/opt/homebrew/bin/tmux")
 CT_RE = re.compile(rb'"customTitle":"([^"]*)"')
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
+BOX_CHARS = "│╭╮╰╯─━┃┌┐└┘┏┓┗┛║╔╗╚╝═╠╣╦╩╬▌▐█"
 
 # Map raw status from session file to display bucket.
 STATUS_MAP = {
@@ -345,6 +347,36 @@ def collect_codex(panes: list[TmuxPane], commands: dict[int, str], children: dic
     return details
 
 
+def tmux_capture(target: str, lines: int = 50) -> str:
+    return run_text([
+        TMUX_BIN, "-S", SOCKET, "capture-pane", "-p",
+        "-t", target, "-S", f"-{lines}", "-E", "-1",
+    ])
+
+
+def waiting_preview(target: str | None) -> str | None:
+    if not target:
+        return None
+    text = tmux_capture(target, 60)
+    if not text:
+        return None
+    text = ANSI_RE.sub("", text)
+    stripper = str.maketrans("", "", BOX_CHARS)
+    cleaned = []
+    for raw in text.splitlines():
+        line = raw.translate(stripper).strip()
+        if line:
+            cleaned.append(line)
+    if not cleaned:
+        return None
+    tail = cleaned[-5:]
+    joined = "  ·  ".join(tail)
+    joined = re.sub(r"\s+", " ", joined)
+    if len(joined) > 220:
+        joined = joined[:217] + "..."
+    return joined
+
+
 def build_payload() -> dict:
     panes = tmux_panes()
     ppid = pid_ppid_map()
@@ -363,6 +395,9 @@ def build_payload() -> dict:
         s.get("project_name") or "",
         -(s.get("updated_at") or 0),
     ))
+    for d in details:
+        if d.get("status") == "Input":
+            d["prompt_preview"] = waiting_preview(d.get("pane_target"))
     blocked = sum(1 for s in details if s["status"] == "Input")
     running = sum(1 for s in details if s["status"] == "Working")
     idle = sum(1 for s in details if s["status"] == "Idle")

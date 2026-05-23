@@ -40,7 +40,7 @@ return {
         chooserPrefix = "hs",
     },
 
-    claudeSessions = {
+    agentSessions = {
         hotkey = { { "cmd", "alt", "ctrl" }, "'" },
     },
 
