@@ -27,6 +27,7 @@ packages:
     - cdb
     - chezmoi
     - cloc
+    - codex
     - coreutils
     - curl
     - diffnav
