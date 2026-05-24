@@ -62,6 +62,8 @@ return {
         snoozeSec        = 2 * 60 * 60,
     },
 
+    crons = {},
+
     processMonitor = {
         requiredApps = {
             "Lumesent",

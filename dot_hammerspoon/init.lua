@@ -62,6 +62,11 @@ spoon.UptimeReminder
     })
     :start()
 
+hs.loadSpoon("Crons")
+spoon.Crons
+    :configure({ jobs = params.crons })
+    :start()
+
 hs.loadSpoon("WindowKit")
 local windowKitOpts = {
     hyperkey = spoon.HyperKey,
