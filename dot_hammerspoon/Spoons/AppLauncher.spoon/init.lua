@@ -60,9 +60,15 @@ local function launchAndCenter(self, path)
     hs.timer.doAfter(0.3, function() self.mouse.toCenter() end)
 end
 
+local lastPress = {}
+local DOUBLE_PRESS_WINDOW = 0.6
+
 local function launchApp(self, name)
     return function()
         local app = hs.application.find(name)
+        local now = hs.timer.secondsSinceEpoch()
+        local prev = lastPress[name]
+        lastPress[name] = now
         if app then
             local windows = windowsOnActiveScreen(app)
             -- Stable order so successive presses cycle deterministically.
@@ -70,6 +76,15 @@ local function launchApp(self, name)
             if #windows > 0 then
                 local focused = hs.window.focusedWindow()
                 local curId = focused and focused:id()
+                if #windows == 1 and curId == windows[1]:id()
+                    and prev and (now - prev) <= DOUBLE_PRESS_WINDOW then
+                    local win = windows[1]
+                    local screen = win:screen()
+                    local g = hs.grid.getGrid(screen)
+                    hs.grid.set(win, { x = math.floor(g.w / 2), y = 0, w = 1, h = 1 }, screen)
+                    hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+                    return
+                end
                 local idx = 0
                 for i, w in ipairs(windows) do
                     if w:id() == curId then idx = i; break end
