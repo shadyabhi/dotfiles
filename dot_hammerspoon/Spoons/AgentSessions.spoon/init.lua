@@ -410,7 +410,7 @@ function obj:start()
         local function activate()
             if selected < 1 then hide_panel(); return end
             local pane = rowPane[selected]
-            hide_panel()
+            hide_panel("user_dismiss")
             if pane then focus_pane(pane) end
         end
 
