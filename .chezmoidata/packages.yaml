@@ -14,6 +14,7 @@ packages:
     - GrowlyX/instantgrep
   brews:
     - act
+    - age
     - agent-browser
     - ansible
     - apache-flink
@@ -42,6 +43,7 @@ packages:
     - gh
     - git-delta
     - gnu-sed
+    - gnupg
     - golang
     - goreleaser
     - gyb
@@ -64,6 +66,7 @@ packages:
     - raine/claude-history/claude-history
     - ripgrep
     - rtmpdump
+    - sops
     - starship
     - switchaudio-osx
     - terminal-notifier
