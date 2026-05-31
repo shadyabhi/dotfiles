@@ -80,10 +80,12 @@ local function caffeinate_set(state, want)
 end
 
 local function parse_and_apply(out, on_data)
-    local ok, data = pcall(hs.json.decode, out or "")
-    if not ok or type(data) ~= "table" then
-        data = { summary = "🔔0 🤔0 💤0", details = {} }
-    end
+    -- A transient empty/truncated read (startup race, timeout) should keep the
+    -- last good state rather than blanking the widget to zeros or logging a
+    -- JSON error. A genuine "no sessions" result is still valid JSON, not empty.
+    if not out or out:match("^%s*$") then return end
+    local ok, data = pcall(hs.json.decode, out)
+    if not ok or type(data) ~= "table" then return end
     data.details = data.details or {}
     data.summary = data.summary or ""
     on_data(data)
@@ -107,7 +109,10 @@ function obj:start()
 
     local last_summary, last_blocked = "", 0
     local blink_on, last_sessions = true, {}
-    local panel_auto_shown, dismissed_waiting_key, last_waiting_key = false, nil, ""
+    local panel_auto_shown = false
+    local dismissed_tokens = {}   -- per-question tokens the user dismissed and that are still pending
+    local waiting_now = {}        -- tokens of sessions waiting on the latest refresh (for dismiss bookkeeping)
+    local last_sig = ""           -- signature of the waiting set, to detect changes
 
     local function render_title()
         if last_blocked == 0 then
@@ -150,12 +155,12 @@ function obj:start()
         return string.format("%dh%02dm ago", hrs, mins % 60)
     end
 
-    local function waiting_key_for(waiting_sessions)
-        local parts = {}
-        for _, s in ipairs(waiting_sessions) do
-            parts[#parts+1] = (s.agent or "?") .. ":" .. (s.session_id or s.cwd or "?") .. "@" .. tostring(s.started_at or 0)
-        end
-        return table.concat(parts, "|")
+    -- A per-question identity for a waiting session. updated_at changes only when
+    -- the session takes a new turn (Claude freezes it while waiting and bumps it on
+    -- the next question), so dismissing one question never suppresses the next one.
+    local function session_token(s)
+        return (s.agent or "?") .. ":" .. (s.session_id or s.cwd or "?")
+            .. "@" .. tostring(s.updated_at or s.started_at or 0)
     end
 
     local maybe_auto_panel  -- forward decl, defined after show_panel
@@ -227,7 +232,7 @@ function obj:start()
             panel:delete(); panel = nil; state.panel = nil
         end
         if reason == "user_dismiss" then
-            dismissed_waiting_key = last_waiting_key
+            for _, tok in ipairs(waiting_now) do dismissed_tokens[tok] = true end
         end
         panel_auto_shown = false
     end
@@ -445,27 +450,45 @@ function obj:start()
         if panel then
             hide_panel("user_dismiss")
         else
-            dismissed_waiting_key = nil
             show_panel(false)
         end
     end
     state.toggle_panel = toggle_panel
 
     maybe_auto_panel = function(waiting_sessions)
-        local key = waiting_key_for(waiting_sessions)
-        local prev_key = last_waiting_key
-        last_waiting_key = key
+        -- Same waiting set the 🔔 count is built from; key each entry per-question.
+        local cur, tokens = {}, {}
+        for _, s in ipairs(waiting_sessions) do
+            local tok = session_token(s)
+            cur[tok] = true
+            tokens[#tokens + 1] = tok
+        end
+        waiting_now = tokens
+        -- Drop dismissals for questions that are no longer pending, so the next
+        -- question (a fresh token) re-arms the popup on its own.
+        for tok in pairs(dismissed_tokens) do
+            if not cur[tok] then dismissed_tokens[tok] = nil end
+        end
+
+        local sig = table.concat(tokens, "|")
+        local changed = sig ~= last_sig
+        last_sig = sig
+
         if #waiting_sessions == 0 then
             if panel and panel_auto_shown then hide_panel() end
-            dismissed_waiting_key = nil
             return
         end
-        if panel then
-            if key ~= prev_key then show_panel(panel_auto_shown) end
-            return
+
+        local unseen = false
+        for _, tok in ipairs(tokens) do
+            if not dismissed_tokens[tok] then unseen = true; break end
         end
-        if key == dismissed_waiting_key then return end
-        show_panel(true)
+
+        if not panel then
+            if unseen then show_panel(true) end       -- new/undismissed question: auto-pop
+        elseif changed then
+            show_panel(unseen and true or panel_auto_shown)  -- keep an open panel current
+        end
     end
 
     local function refresh()
@@ -478,11 +501,23 @@ function obj:start()
             end
         end
         in_flight_started = hs.timer.secondsSinceEpoch()
-        in_flight = hs.task.new(self.script, function(_, stdout, _)
-            in_flight = nil
-            state.in_flight = nil
-            parse_and_apply(stdout, apply_data)
-        end)
+        -- Accumulate stdout via a streaming reader. The completion-only form of
+        -- hs.task lets the ~64KB OS pipe fill and then deadlocks (the completion
+        -- callback never fires), and this script's output exceeds that as soon as
+        -- a handful of sessions are listed. Read every chunk, then parse the join.
+        local chunks = {}
+        in_flight = hs.task.new(
+            self.script,
+            function(_, _, _)
+                in_flight = nil
+                state.in_flight = nil
+                parse_and_apply(table.concat(chunks), apply_data)
+            end,
+            function(_, stdout, _)
+                if stdout and #stdout > 0 then chunks[#chunks + 1] = stdout end
+                return true
+            end
+        )
         if not in_flight then
             state.in_flight = nil
             parse_and_apply("", apply_data)

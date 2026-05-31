@@ -335,13 +335,15 @@ def collect_codex(panes: list[TmuxPane], commands: dict[int, str], children: dic
     for row in rows:
         thread_id = row.get("id")
         pane_target = live_panes.get(thread_id)
-        running, started_at, prompt_preview = codex_turn_state(row.get("rollout_path"))
+        # The threads table is a persistent history of every Codex conversation.
+        # Only surface threads attached to a live tmux pane, so the list reflects
+        # running sessions (matching Claude, whose session files are live-only)
+        # rather than every past thread. This also avoids parsing the rollout
+        # JSONL of every historical thread on each refresh.
         if not pane_target:
-            status = "Idle"
-        elif running:
-            status = "Working"
-        else:
-            status = "Idle"
+            continue
+        running, started_at, prompt_preview = codex_turn_state(row.get("rollout_path"))
+        status = "Working" if running else "Idle"
 
         cwd = row.get("cwd")
         title = row.get("title") or row.get("agent_nickname") or thread_id
