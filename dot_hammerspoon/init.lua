@@ -48,6 +48,11 @@ spoon.AgentSessions
     :configure({ hotkey = params.agentSessions.hotkey })
     :start()
 
+hs.loadSpoon("Pomodoro")
+spoon.Pomodoro
+    :configure({ hotkey = params.pomodoro.hotkey })
+    :start()
+
 hs.loadSpoon("CenterNativeNotifications")
 spoon.CenterNativeNotifications:start()
 

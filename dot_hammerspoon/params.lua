@@ -44,6 +44,10 @@ return {
         hotkey = { { "cmd", "alt", "ctrl" }, "'" },
     },
 
+    pomodoro = {
+        hotkey = { { "cmd", "alt", "ctrl" }, "p" },
+    },
+
     windowKit = {
         gridDims    = "3x2",
         gridMargins = "1x1",
