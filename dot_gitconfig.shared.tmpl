@@ -70,9 +70,9 @@
     #   git sync-fork          # ff fork's default branch from origin (auto-creates fork)
     #   git checkout -b feat/x  # branch off master as usual
     #   ...hack, commit...
-    #   git push-on-fork       # push branch to fork, sets upstream
+    #   git push-on-fork       # syncs fork, pushes branch, sets upstream, opens PR link
     #   git pf                 # subsequent force-pushes (uses upstream → fork)
-    #   git open-pr            # open browser: compare fork:branch → origin:default
+    #   git open-pr            # (also run by push-on-fork) compare fork:branch → origin:default
     # Override fork remote name (default ${USER}-fork): git config fork.remote <name>
     # Scripts: ~/scripts/git/git-{sync-fork,push-on-fork,open-pr} (git auto-discovers git-* on PATH).
 

@@ -14,4 +14,11 @@ case "$branch" in
 esac
 
 ensure_fork
+
+# Prerequisite: ff the fork's default branch from origin so it doesn't drift.
+"$(dirname "$0")/git-sync-fork"
+
 git push -u "$fork_remote" "$branch"
+
+# Surface the PR compare link (and open it in the browser).
+"$(dirname "$0")/git-open-pr"

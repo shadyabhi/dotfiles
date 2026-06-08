@@ -7,12 +7,22 @@ ensure_fork() {
     if git remote get-url "$fork_remote" >/dev/null 2>&1; then
         return 0
     fi
-    local origin_url slug
+    local origin_url slug out fork_url
     origin_url=$(git remote get-url origin)
     # owner/repo: strip protocol+host, trailing .git, trailing slash
     slug=$(echo "$origin_url" | sed -E 's#^[^:]+://[^/]+/##; s#\.git$##; s#/$##')
     echo "Fork remote '$fork_remote' missing; creating via gh repo fork $slug" >&2
-    gh repo fork "$slug" --remote --remote-name "$fork_remote" --clone=false
+    # --remote/--remote-name are rejected when a repo arg is given, so fork
+    # first, then add the remote from the fork URL gh prints (its resolved
+    # host may differ from origin's, e.g. git.netflix.net → github.netflix.net).
+    out=$(gh repo fork "$slug" --clone=false 2>&1)
+    fork_url=$(echo "$out" | grep -oE 'https?://[^ ]+' | tail -1)
+    if [ -z "$fork_url" ]; then
+        echo "$out" >&2
+        echo "ERROR: could not determine fork URL from gh output" >&2
+        return 1
+    fi
+    git remote add "$fork_remote" "$fork_url"
 }
 
 default_branch() {
