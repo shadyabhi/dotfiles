@@ -23,6 +23,7 @@ vim.g.maplocalleader = "\\"
 
 vim.opt.number = true
 vim.opt.relativenumber = false
+vim.opt.tabstop = 4
 
 -- ZZ / ZQ exit nvim entirely instead of just the current window.
 vim.keymap.set("n", "ZZ", "<cmd>wqall<cr>", { desc = "Write all and quit nvim" })
