@@ -24,6 +24,7 @@ vim.g.maplocalleader = "\\"
 vim.opt.number = true
 vim.opt.relativenumber = false
 vim.opt.tabstop = 4
+vim.opt.autoread = true -- auto-reload files changed outside of nvim
 
 -- ZZ / ZQ exit nvim entirely instead of just the current window.
 vim.keymap.set("n", "ZZ", "<cmd>wqall<cr>", { desc = "Write all and quit nvim" })
