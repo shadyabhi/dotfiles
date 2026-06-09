@@ -71,6 +71,7 @@ packages:
     - switchaudio-osx
     - terminal-notifier
     - tmux
+    - tree-sitter-cli
     - urlview
     - uv
     - watch
