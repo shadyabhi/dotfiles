@@ -4,7 +4,7 @@ When doing tasks, always start parallel agents if they can be done independently
 
 ## Code Changes
 
-- Comments: When doing code-changes, ensure that comments are up-to-date as well.
+- Comments: Write concise comments, only when code isn't explanatory and when doing code-changes, ensure that comments are up-to-date as well.
 
 ## Git
 
