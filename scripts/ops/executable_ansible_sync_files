@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""
+atar: scp-like directory transfer via ansible.
+
+Usage: atar <[host:]src> <[host:]dest>
+"""
+
+import subprocess
+import sys
+
+
+def split(arg):
+    host, _, path = arg.partition(":") if ":" in arg else ("", "", arg)
+    return host, path
+
+
+def main():
+    if len(sys.argv) != 3:
+        sys.exit(f"Usage: {sys.argv[0]} <[host:]src> <[host:]dest>")
+
+    src_host, src_path = split(sys.argv[1])
+    dst_host, dst_path = split(sys.argv[2])
+
+    if src_host and dst_host:
+        sys.exit("remote-to-remote not supported")
+
+    if dst_host:
+        host, module, args = dst_host, "ansible.builtin.copy", f"src={src_path} dest={dst_path}"
+    elif src_host:
+        host, module, args = src_host, "ansible.builtin.fetch", f"src={src_path} dest={dst_path} flat=yes"
+    else:
+        sys.exit("at least one side must be <host>:<path>")
+
+    subprocess.run(
+        ["ansible", host, "-i", f"{host},", "-m", module, "-a", args],
+        check=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
