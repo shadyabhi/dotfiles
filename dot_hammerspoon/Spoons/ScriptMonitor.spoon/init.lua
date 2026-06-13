@@ -48,10 +48,17 @@ local function buildCmd(spec)
 end
 
 local function fireEvent(spec)
+    -- Cancel any already-pending timer for this spec to debounce rapid events
+    if spec._pending then
+        spec._pending:stop()
+        spec._pending = nil
+    end
+
     local cmd = buildCmd(spec)
     local delay = spec.delaySec or 0
     if delay > 0 then
-        hs.timer.doAfter(delay, function()
+        spec._pending = hs.timer.doAfter(delay, function()
+            spec._pending = nil
             hs.execute(cmd)
             log.f("ran %s after %ds", cmd, delay)
         end)
