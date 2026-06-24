@@ -4,14 +4,15 @@ meta:
   enable_sudo: []
 packages:
   taps:
+    - GrowlyX/instantgrep
+    - umputun/apps/revdiff
     - derailed/k9s
     - goreleaser/tap
     - hashicorp/tap
+    - jazzyalex/agent-sessions
     - krishkrosh/apps
     - shadyabhi/tap
     - tldev/tap
-    - jazzyalex/agent-sessions
-    - GrowlyX/instantgrep
   brews:
     - act
     - age
