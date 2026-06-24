@@ -145,6 +145,42 @@ function obj:start()
         hs.application.launchOrFocus(self.terminalApp)
     end
 
+    -- Non-tmux sessions (e.g. Claude in IntelliJ's or VS Code's built-in
+    -- terminal) have no pane to switch to: the shell runs as a descendant of
+    -- the host GUI app, so walk the process tree up from the session's pid
+    -- until a pid resolves to a running application, then raise it.
+    -- Map running app pids once. hs.application.applicationForPID logs a console
+    -- error for every non-app pid, and a process-tree walk hits several before
+    -- reaching the host app; a membership check against this map stays quiet.
+    local function running_app_map()
+        local appByPid = {}
+        for _, a in ipairs(hs.application.runningApplications()) do
+            appByPid[a:pid()] = a
+        end
+        return appByPid
+    end
+
+    -- Non-tmux sessions (e.g. Claude in IntelliJ's or VS Code's built-in
+    -- terminal) have no pane to switch to: the shell runs as a descendant of the
+    -- host GUI app. Walk the process tree up from pid until one resolves to a
+    -- running application.
+    local function app_for_pid(pid, appByPid)
+        pid = tonumber(pid)
+        local seen = {}
+        while pid and pid > 1 and not seen[pid] do
+            seen[pid] = true
+            if appByPid[pid] then return appByPid[pid] end
+            local out = hs.execute("/bin/ps -o ppid= -p " .. pid .. " 2>/dev/null")
+            pid = tonumber((out or ""):match("%d+"))
+        end
+        return nil
+    end
+
+    local function focus_app_for_pid(pid)
+        local app = app_for_pid(pid, running_app_map())
+        if app then app:activate(true) end
+    end
+
     local function fmt_ago(ms)
         if not ms or type(ms) ~= "number" then return "?" end
         local secs = math.max(0, math.floor(os.time() - ms / 1000))
@@ -266,30 +302,32 @@ function obj:start()
             table.sort(groups[k], function(a, b) return age_key(a) > age_key(b) end)
         end
 
-        local pad, rowH, headerH, sectionGap, previewH = 16, 30, 28, 8, 22
-        local W = 760
+        local pad, rowH, headerH, sectionGap, previewH = 28, 48, 44, 14, 34
         local function has_preview(s)
             return s.status == "Input" and s.prompt_preview and s.prompt_preview ~= ""
         end
         local visible = {}
-        local H = pad
+        local contentH = pad
         for _, k in ipairs(order) do
             if #groups[k] > 0 then
                 visible[#visible + 1] = k
-                H = H + headerH + sectionGap
+                contentH = contentH + headerH + sectionGap
                 for _, s in ipairs(groups[k]) do
-                    H = H + rowH + (has_preview(s) and previewH or 0)
+                    contentH = contentH + rowH + (has_preview(s) and previewH or 0)
                 end
             end
         end
-        if #visible == 0 then H = H + headerH end
-        H = H + pad
+        if #visible == 0 then contentH = contentH + headerH end
+        contentH = contentH + pad
 
+        -- Fixed 75% of the active screen (the one with keyboard focus), centered
+        -- on both axes. Content is vertically centered within the box rather than
+        -- pinned to the top, so a few rows don't cluster in one corner.
         local sf = hs.screen.mainScreen():frame()
-        local x = sf.x + (sf.w - W) / 2
-        local y = sf.y + sf.h * 0.15
-        if prev_tl then x, y = prev_tl.x, prev_tl.y
-        elseif panel_origin then x, y = panel_origin.x, panel_origin.y end
+        local W = math.floor(sf.w * 0.75)
+        local H = math.floor(sf.h * 0.75)
+        local x = sf.x + math.floor((sf.w - W) / 2)
+        local y = sf.y + math.floor((sf.h - H) / 2)
         local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
@@ -304,17 +342,33 @@ function obj:start()
             strokeWidth = 0.5,
         }
 
-        local rowPane, rowHiIdx = {}, {}
-        local cursorY = pad
+        local rowPane, rowPid, rowHiIdx, rowCount = {}, {}, {}, 0
+        local cursorY = math.max(pad, math.floor((H - contentH) / 2))
+
+        -- Host-app icon per row: tmux sessions live under the terminal app;
+        -- non-tmux sessions resolve via the process-tree walk. Cache by bundle id
+        -- so repeated lookups (and the same app across rows) cost one fetch.
+        local appByPid = running_app_map()
+        local termApp = hs.application.find(self.terminalApp)
+        local iconCache = {}
+        local function host_icon(s)
+            local app = s.pane_target and termApp or app_for_pid(s.pid, appByPid)
+            local bid = app and app:bundleID()
+            if not bid then return nil end
+            if iconCache[bid] == nil then
+                iconCache[bid] = hs.image.imageFromAppBundle(bid) or false
+            end
+            return iconCache[bid] or nil
+        end
 
         if #visible == 0 then
             c[#c + 1] = {
                 type = "text",
                 text = "No active sessions",
                 textColor = { white = 0.65 },
-                textSize = 16,
+                textSize = 24,
                 textFont = "Menlo",
-                frame = { x = pad, y = cursorY + 4, w = W - 2 * pad, h = headerH },
+                frame = { x = pad, y = cursorY + 6, w = W - 2 * pad, h = headerH },
             }
         end
 
@@ -325,14 +379,20 @@ function obj:start()
                 type = "text",
                 text = hdr.icon .. "  " .. hdr.label .. "  (" .. #list .. ")",
                 textColor = hdr.color,
-                textSize = 14,
+                textSize = 22,
                 textFont = "Menlo-Bold",
-                frame = { x = pad, y = cursorY + 4, w = W - 2 * pad, h = headerH },
+                frame = { x = pad, y = cursorY + 8, w = W - 2 * pad, h = headerH },
             }
             cursorY = cursorY + headerH
             for _, s in ipairs(list) do
-                local rowIdx = #rowPane + 1
-                rowPane[rowIdx] = s.pane_target
+                -- Count rows explicitly: a non-tmux session has a nil pane_target,
+                -- and `rowPane[#rowPane+1] = nil` is a no-op that would leave the
+                -- array empty, making `total` 0. Store `false` as a dense
+                -- placeholder so every visible row is selectable and dismissible.
+                rowCount = rowCount + 1
+                local rowIdx = rowCount
+                rowPane[rowIdx] = s.pane_target or false
+                rowPid[rowIdx] = s.pid
                 local thisH = rowH + (has_preview(s) and previewH or 0)
                 local hi = #c + 1
                 c[hi] = {
@@ -351,9 +411,23 @@ function obj:start()
                 local agent = s.agent or "Agent"
                 local proj  = s.project_name or "?"
                 local name  = s.session_name or s.room_id or ""
-                local left  = "  " .. agent .. " · " .. proj
+                local left  = agent .. " · " .. proj
                 if name ~= "" then left = left .. " · " .. name end
                 local right = (s.model_display or "?") .. " · " .. (s.context_display or "?") .. " · " .. fmt_ago(s.started_at) .. "  "
+
+                -- Host-app icon, then text offset to clear it. Non-interactive:
+                -- without a tracking flag the click falls through to the row rect.
+                local iconSz, iconGap = 32, 12
+                local textX = pad + iconSz + iconGap
+                local icon = host_icon(s)
+                if icon then
+                    c[#c + 1] = {
+                        type = "image",
+                        image = icon,
+                        imageScaling = "scaleProportionally",
+                        frame = { x = pad, y = cursorY + (rowH - iconSz) / 2, w = iconSz, h = iconSz },
+                    }
+                end
 
                 c[#c + 1] = {
                     type = "text",
@@ -362,9 +436,9 @@ function obj:start()
                     trackMouseEnterExit = true,
                     text = left,
                     textColor = { white = 0.92 },
-                    textSize = 14,
+                    textSize = 20,
                     textFont = "Menlo",
-                    frame = { x = pad, y = cursorY + 6, w = W * 0.55, h = rowH - 8 },
+                    frame = { x = textX, y = cursorY + 11, w = W * 0.55 - (textX - pad), h = rowH - 8 },
                 }
                 c[#c + 1] = {
                     type = "text",
@@ -373,10 +447,10 @@ function obj:start()
                     trackMouseEnterExit = true,
                     text = right,
                     textColor = { white = 0.60 },
-                    textSize = 13,
+                    textSize = 18,
                     textFont = "Menlo",
                     textAlignment = "right",
-                    frame = { x = W * 0.55, y = cursorY + 7, w = W * 0.45 - pad, h = rowH - 8 },
+                    frame = { x = W * 0.55, y = cursorY + 13, w = W * 0.45 - pad, h = rowH - 8 },
                 }
                 if has_preview(s) then
                     c[#c + 1] = {
@@ -386,7 +460,7 @@ function obj:start()
                         trackMouseEnterExit = true,
                         text = "  ↳ " .. s.prompt_preview,
                         textColor = { red = 1.00, green = 0.80, blue = 0.55, alpha = 0.85 },
-                        textSize = 12,
+                        textSize = 16,
                         textFont = "Menlo",
                         frame = { x = pad + 4, y = cursorY + rowH - 2, w = W - 2 * pad - 4, h = previewH },
                     }
@@ -396,7 +470,7 @@ function obj:start()
             cursorY = cursorY + sectionGap
         end
 
-        local total = #rowPane
+        local total = rowCount
         local selected = total > 0 and 1 or 0
 
         local function paint(i, on)
@@ -415,8 +489,9 @@ function obj:start()
         local function activate()
             if selected < 1 then hide_panel(); return end
             local pane = rowPane[selected]
+            local pid = rowPid[selected]
             hide_panel("user_dismiss")
-            if pane then focus_pane(pane) end
+            if pane then focus_pane(pane) else focus_app_for_pid(pid) end
         end
 
         c:mouseCallback(function(_, evt, elemId)
