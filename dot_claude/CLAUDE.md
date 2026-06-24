@@ -1,3 +1,7 @@
+# General
+
+- When writing responses, never use Emdash "—"
+
 # Tasks
 
 When doing tasks, always start parallel agents if they can be done independently. Then, you can analyze the agent results and continue with next steps.
@@ -9,6 +13,10 @@ When doing tasks, always start parallel agents if they can be done independently
 ## Git
 
 Commit format: `<component>: summary` + blank line + detailed why/what. Use `git log` on modified files for component hints.
+
+# Answering questions
+
+When answering a direct question, don't just provide your answer. Provide with links, code-examples, how you arrived at that answer.
 
 # Voice & Tone
 

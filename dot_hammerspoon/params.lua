@@ -28,6 +28,7 @@ return {
         { "c", "Google Calendar" },
         { "e", "Microsoft Edge" },
         { "g", "Gmail" },
+        { "i", "IntelliJ IDEA" },
         { "r", "Reclaim" },
         { "s", "Slack" },
         { "t", "iTerm" },
