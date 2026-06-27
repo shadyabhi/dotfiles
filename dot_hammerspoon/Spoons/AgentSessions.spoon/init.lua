@@ -51,6 +51,7 @@ local function teardown_prior()
         if s.blink_timer then s.blink_timer:stop() end
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
+        if s.status_bar then s.status_bar:delete() end
         if s.hotkey then s.hotkey:delete() end
         for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
             if s[k] then s[k]:delete() end
@@ -107,7 +108,7 @@ function obj:start()
     bar:setTitle("…")
     state.bar = bar
 
-    local last_summary, last_blocked = "", 0
+    local last_summary, last_blocked, last_working = "", 0, 0
     local blink_on, last_sessions = true, {}
     local panel_auto_shown = false
     local dismissed_tokens = {}   -- per-question tokens the user dismissed and that are still pending
@@ -199,7 +200,116 @@ function obj:start()
             .. "@" .. tostring(s.updated_at or s.started_at or 0)
     end
 
+    local panel = nil
+    local panel_origin = nil
+    local status_bar = nil
     local maybe_auto_panel  -- forward decl, defined after show_panel
+    local toggle_panel      -- forward decl, defined after show_panel
+
+    local function status_bar_frame()
+        local sf = hs.screen.mainScreen():fullFrame()
+        local W, H = math.min(560, sf.w), 46
+        return {
+            x = sf.x,
+            y = sf.y + sf.h - H,
+            w = W,
+            h = H,
+        }
+    end
+
+    local function render_status_bar(sessions, waiting, working)
+        local idle = math.max(0, #sessions - waiting - working)
+        local frame = status_bar_frame()
+        if status_bar then status_bar:delete(); status_bar = nil; state.status_bar = nil end
+
+        local c = hs.canvas.new(frame)
+        c:level(hs.canvas.windowLevels.overlay)
+        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
+        c[1] = {
+            type = "rectangle",
+            id = "bar_bg",
+            trackMouseDown = true,
+            roundedRectRadii = { xRadius = 12, yRadius = 12 },
+            fillColor = { red = 0.10, green = 0.12, blue = 0.13, alpha = 0.94 },
+            strokeColor = { red = 0.24, green = 0.26, blue = 0.27, alpha = 0.85 },
+            strokeWidth = 1,
+        }
+        c[2] = {
+            type = "rectangle",
+            id = "bar_pulse",
+            trackMouseDown = true,
+            frame = { x = 22, y = 12, w = 22, h = 22 },
+            roundedRectRadii = { xRadius = 11, yRadius = 11 },
+            fillColor = { red = 0.25, green = 0.95, blue = 0.40, alpha = working > 0 and 1 or 0.30 },
+            strokeColor = { white = 1, alpha = 0.18 },
+            strokeWidth = 0.5,
+        }
+
+        local x, y = 60, 10
+        local function add_segment(count, label, color, width)
+            c[#c + 1] = {
+                type = "text",
+                id = "seg_count",
+                trackMouseDown = true,
+                text = tostring(count),
+                textColor = color,
+                textSize = 22,
+                textFont = "Menlo-Bold",
+                frame = { x = x, y = y - 1, w = 36, h = 28 },
+            }
+            c[#c + 1] = {
+                type = "text",
+                id = "seg_label",
+                trackMouseDown = true,
+                text = label,
+                textColor = { white = 0.86, alpha = 1 },
+                textSize = 20,
+                textFont = ".AppleSystemUIFont",
+                frame = { x = x + 28, y = y + 1, w = width - 28, h = 26 },
+            }
+            x = x + width
+        end
+
+        add_segment(working, "running", { red = 0.25, green = 0.95, blue = 0.40, alpha = 1 }, 118)
+        c[#c + 1] = {
+            type = "text",
+            trackMouseDown = true,
+            text = "·",
+            textColor = { white = 0.58, alpha = 1 },
+            textSize = 20,
+            textFont = "Menlo",
+            frame = { x = x, y = y + 1, w = 18, h = 26 },
+        }
+        x = x + 28
+        add_segment(waiting, "needs you", { red = 1.00, green = 0.60, blue = 0.05, alpha = 1 }, 148)
+        c[#c + 1] = {
+            type = "text",
+            trackMouseDown = true,
+            text = "·",
+            textColor = { white = 0.58, alpha = 1 },
+            textSize = 20,
+            textFont = "Menlo",
+            frame = { x = x, y = y + 1, w = 18, h = 26 },
+        }
+        x = x + 28
+        add_segment(idle, "done", { white = 0.78, alpha = 1 }, 96)
+        c[#c + 1] = {
+            type = "text",
+            trackMouseDown = true,
+            text = panel and "⌃" or "⌄",
+            textColor = { white = 0.58, alpha = 1 },
+            textSize = 19,
+            textFont = "Menlo-Bold",
+            textAlignment = "center",
+            frame = { x = frame.w - 50, y = y + 1, w = 24, h = 26 },
+        }
+        c:mouseCallback(function(_, evt)
+            if evt == "mouseDown" and toggle_panel then toggle_panel() end
+        end)
+        c:show()
+        status_bar = c
+        state.status_bar = c
+    end
 
     local function apply_data(data)
         local sessions = data.details
@@ -214,10 +324,12 @@ function obj:start()
         end
         last_summary = data.summary
         last_blocked = waiting
+        last_working = working
         render_title()
         bar:setTooltip(#sessions .. " session(s) · " .. waiting .. " waiting")
         caffeinate_set(state, working > 0)
         last_sessions = sessions
+        render_status_bar(sessions, waiting, working)
         if maybe_auto_panel then maybe_auto_panel(waiting_sessions) end
     end
 
@@ -255,9 +367,6 @@ function obj:start()
 
     bar:setClickCallback(function() show_chooser() end)
 
-    local panel = nil
-    local panel_origin = nil
-
     local function hide_panel(reason)
         for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
             if state[k] then state[k]:delete(); state[k] = nil end
@@ -267,6 +376,7 @@ function obj:start()
             if ok and tl then panel_origin = tl end
             panel:delete(); panel = nil; state.panel = nil
         end
+        render_status_bar(last_sessions, last_blocked, last_working)
         if reason == "user_dismiss" then
             for _, tok in ipairs(waiting_now) do dismissed_tokens[tok] = true end
         end
@@ -320,14 +430,12 @@ function obj:start()
         if #visible == 0 then contentH = contentH + headerH end
         contentH = contentH + pad
 
-        -- Fixed 75% of the active screen (the one with keyboard focus), centered
-        -- on both axes. Content is vertically centered within the box rather than
-        -- pinned to the top, so a few rows don't cluster in one corner.
         local sf = hs.screen.mainScreen():frame()
-        local W = math.floor(sf.w * 0.75)
-        local H = math.floor(sf.h * 0.75)
-        local x = sf.x + math.floor((sf.w - W) / 2)
-        local y = sf.y + math.floor((sf.h - H) / 2)
+        local barFrame = status_bar_frame()
+        local W = math.min(680, sf.w - 44)
+        local H = math.min(math.max(contentH, 190), math.floor(sf.h * 0.72))
+        local x = math.max(sf.x + 22, barFrame.x + barFrame.w - W)
+        local y = math.max(sf.y + 22, barFrame.y - H - 10)
         local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
@@ -513,6 +621,7 @@ function obj:start()
         panel = c
         state.panel = c
         panel_auto_shown = was_auto and true or false
+        render_status_bar(last_sessions, last_blocked, last_working)
         state.panel_esc       = hs.hotkey.bind({}, "escape", function() hide_panel("user_dismiss") end)
         state.panel_up        = hs.hotkey.bind({}, "up",     function() set_selected(selected - 1) end)
         state.panel_down      = hs.hotkey.bind({}, "down",   function() set_selected(selected + 1) end)
@@ -521,7 +630,7 @@ function obj:start()
         state.panel_shifttab  = hs.hotkey.bind({ "shift" }, "tab", function() set_selected((selected - 2) % math.max(1, total) + 1) end)
     end
 
-    local function toggle_panel()
+    toggle_panel = function()
         if panel then
             hide_panel("user_dismiss")
         else
