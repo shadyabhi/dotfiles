@@ -20,9 +20,11 @@ obj.hotkey = { { "cmd", "alt", "ctrl" }, "p" }
 obj.width = 460
 obj.height = 92
 obj.inputWidth = 420
-obj.inputHeight = 255
+obj.inputHeight = 514
 obj.updateIntervalSec = 1
 obj.completeSound = nil
+obj.flashDurationSec = 1.4
+obj.guardIntervalSec = 1
 
 obj._hotkey = nil
 obj._webview = nil
@@ -33,6 +35,11 @@ obj._startedAt = nil
 obj._durationSec = nil
 obj._title = nil
 obj._dragTap = nil
+obj._allowedKeys = nil
+obj._guardTimer = nil
+obj._lastBadKey = nil
+obj._flashCanvas = nil
+obj._flashTimer = nil
 
 local function activeScreen()
     local fw = hs.window.focusedWindow()
@@ -81,8 +88,117 @@ local function fmtRemaining(sec)
     return string.format("%02d:%02d", math.floor(sec / 60), sec % 60)
 end
 
-local function inputHtml()
-    return [[
+-- Browsers we can introspect via AppleScript, mapped to their scripting dialect.
+-- "safari" uses `current tab`; "chrome" (Chromium family) uses `active tab`.
+local BROWSERS = {
+    ["Safari"] = "safari",
+    ["Safari Technology Preview"] = "safari",
+    ["Google Chrome"] = "chrome",
+    ["Google Chrome Canary"] = "chrome",
+    ["Brave Browser"] = "chrome",
+    ["Microsoft Edge"] = "chrome",
+    ["Vivaldi"] = "chrome",
+    ["Chromium"] = "chrome",
+    ["Arc"] = "chrome",
+}
+
+-- URL of the frontmost window's active tab, or nil if unavailable.
+local function activeTabUrl(appName)
+    local style = BROWSERS[appName]
+    if not style then return nil end
+    local tabRef = (style == "safari") and "current tab" or "active tab"
+    local script = string.format([[
+        tell application "%s"
+            if (count of windows) is 0 then return ""
+            return URL of %s of front window
+        end tell
+    ]], appName, tabRef)
+    local ok, res = hs.osascript.applescript(script)
+    if ok and type(res) == "string" and res ~= "" then return res end
+    return nil
+end
+
+-- All open tabs across every running supported browser: { app, title, url }.
+local function listBrowserTabs()
+    local out = {}
+    for _, app in ipairs(hs.application.runningApplications()) do
+        local name = app:name()
+        local style = BROWSERS[name]
+        if style then
+            local titleProp = (style == "safari") and "name" or "title"
+            -- Field separator is a unit separator (char 31); AppleScript's `tab`
+            -- constant serializes as the literal text "tab" here, not a tab char.
+            local script = string.format([[
+                set out to {}
+                tell application "%s"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            try
+                                set end of out to (%s of t) & (character id 31) & (URL of t)
+                            end try
+                        end repeat
+                    end repeat
+                end tell
+                set AppleScript's text item delimiters to linefeed
+                return out as text
+            ]], name, titleProp)
+            local ok, res = hs.osascript.applescript(script)
+            if ok and type(res) == "string" then
+                for line in (res .. "\n"):gmatch("(.-)\n") do
+                    local title, url = line:match("^(.-)" .. string.char(31) .. "(.*)$")
+                    if url and url ~= "" then
+                        out[#out + 1] = {
+                            app = name,
+                            title = (title and title ~= "") and title or url,
+                            url = url,
+                        }
+                    end
+                end
+            end
+        end
+    end
+    return out
+end
+
+-- Selectable focus targets for the dialog: non-browser windows plus browser tabs.
+-- Each item carries a stable `key`: "win:<id>" for windows, "tab:<url>" for tabs.
+local function listItems()
+    local items = {}
+    for _, w in ipairs(hs.window.orderedWindows()) do
+        local app = w:application()
+        local appName = (app and app:name()) or "?"
+        if w:isStandard() and w:title() ~= ""
+            and appName ~= "Hammerspoon" and not BROWSERS[appName] then
+            items[#items + 1] = {
+                key = "win:" .. tostring(w:id()),
+                app = appName,
+                title = w:title(),
+                kind = "window",
+            }
+        end
+    end
+    for _, t in ipairs(listBrowserTabs()) do
+        items[#items + 1] = {
+            key = "tab:" .. t.url,
+            app = t.app,
+            title = t.title,
+            kind = "tab",
+        }
+    end
+    return items
+end
+
+-- Comma-separated, URL-encoded keys -> { ["win:12"] = true, ["tab:https://..."] = true }
+local function parseAllowed(str)
+    local set = {}
+    for part in tostring(str or ""):gmatch("[^,]+") do
+        set[urlDecode(part)] = true
+    end
+    return set
+end
+
+local function inputHtml(windowsJson)
+    local html = [[
 <!doctype html>
 <html>
 <head>
@@ -178,6 +294,87 @@ local function inputHtml()
         background: rgba(78, 179, 255, 0.22);
         color: white;
     }
+    #filter {
+        height: 34px;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+    .win.hidden {
+        display: none;
+    }
+    .windows {
+        max-height: 168px;
+        margin-bottom: 16px;
+        padding: 4px;
+        overflow-y: auto;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.24);
+    }
+    .windows .empty {
+        padding: 14px 8px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 13px;
+        text-align: center;
+    }
+    .win {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 8px;
+        border-radius: 7px;
+        cursor: pointer;
+    }
+    .win:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .win input {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        flex: 0 0 auto;
+        accent-color: rgb(78, 179, 255);
+    }
+    .win span {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        line-height: 1.25;
+    }
+    .win strong {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 13px;
+        font-weight: 650;
+    }
+    .tag {
+        flex: 0 0 auto;
+        padding: 1px 6px;
+        border-radius: 5px;
+        font-size: 9px;
+        font-style: normal;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+    }
+    .tag-window {
+        background: rgba(255, 255, 255, 0.14);
+        color: rgba(255, 255, 255, 0.7);
+    }
+    .tag-tab {
+        background: rgba(78, 179, 255, 0.22);
+        color: rgb(120, 196, 255);
+    }
+    .win em {
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+        font-style: normal;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     button {
         width: 100%;
         height: 38px;
@@ -201,13 +398,75 @@ local function inputHtml()
         <label><input type="radio" name="minutes" value="15"><span>15m</span></label>
         <label><input type="radio" name="minutes" value="25" checked><span>25m</span></label>
     </div>
+    <label>Allowed windows</label>
+    <input id="filter" type="text" autocomplete="off" placeholder="Filter by app or title…">
+    <div class="windows" id="windows"></div>
     <button type="submit">Start</button>
 </form>
 <script>
     const form = document.getElementById("pomodoro-form");
     const title = document.getElementById("title");
     const dragHandle = document.getElementById("drag-handle");
+    const windowsEl = document.getElementById("windows");
+    const filterEl = document.getElementById("filter");
+    const ITEMS = __ITEMS_JSON__;
+    const rows = [];
     let submitted = false;
+
+    if (ITEMS.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No open windows or tabs found";
+        windowsEl.appendChild(empty);
+    } else {
+        ITEMS.forEach((item) => {
+            const row = document.createElement("label");
+            row.className = "win";
+            row.dataset.search = (item.app + " " + item.title).toLowerCase();
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.className = "win-check";
+            cb.value = item.key;
+            const span = document.createElement("span");
+            const app = document.createElement("strong");
+            const tag = document.createElement("i");
+            tag.className = "tag tag-" + item.kind;
+            tag.textContent = item.kind === "tab" ? "tab" : "win";
+            app.appendChild(tag);
+            app.appendChild(document.createTextNode(item.app));
+            const t = document.createElement("em");
+            t.textContent = item.title;
+            span.appendChild(app);
+            span.appendChild(t);
+            row.appendChild(cb);
+            row.appendChild(span);
+            windowsEl.appendChild(row);
+            rows.push(row);
+        });
+
+        const noMatch = document.createElement("div");
+        noMatch.className = "empty";
+        noMatch.textContent = "No matches";
+        noMatch.style.display = "none";
+        windowsEl.appendChild(noMatch);
+
+        filterEl.addEventListener("input", () => {
+            const q = filterEl.value.trim().toLowerCase();
+            let visible = 0;
+            rows.forEach((row) => {
+                const match = q === "" || row.dataset.search.indexOf(q) !== -1;
+                row.classList.toggle("hidden", !match);
+                if (match) visible++;
+            });
+            noMatch.style.display = visible === 0 ? "block" : "none";
+        });
+    }
+
+    function selectedKeys() {
+        return Array.from(document.querySelectorAll(".win-check:checked"))
+            .map((c) => encodeURIComponent(c.value))
+            .join(",");
+    }
 
     function navigate(eventName, params) {
         const query = Object.entries(params || {})
@@ -222,7 +481,8 @@ local function inputHtml()
         submitted = true;
         navigate("pomodorostart", {
             title: title.value,
-            minutes: document.querySelector("input[name='minutes']:checked").value
+            minutes: document.querySelector("input[name='minutes']:checked").value,
+            allowed: selectedKeys()
         });
     });
 
@@ -244,6 +504,9 @@ local function inputHtml()
 </body>
 </html>
 ]]
+    return (html:gsub("__ITEMS_JSON__", function()
+        return windowsJson or "[]"
+    end))
 end
 
 function obj:_hideInput()
@@ -288,6 +551,7 @@ end
 
 function obj:_stopTimer()
     self:_stopDrag()
+    self:_stopFocusGuard()
     if self._timer then
         self._timer:stop()
         self._timer = nil
@@ -300,6 +564,102 @@ function obj:_stopTimer()
     self._startedAt = nil
     self._durationSec = nil
     self._title = nil
+    self._allowedKeys = nil
+    self._lastBadKey = nil
+end
+
+-- Translucent full-screen red flash nudging the user back to an allowed window.
+function obj:_flashFocus()
+    if self._flashTimer then
+        self._flashTimer:stop()
+        self._flashTimer = nil
+    end
+
+    if not self._flashCanvas then
+        local f = activeScreen():fullFrame()
+        local c = hs.canvas.new(f)
+        c:level(hs.canvas.windowLevels.overlay)
+        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
+            + hs.canvas.windowBehaviors.stationary)
+        c:replaceElements({
+            {
+                type = "rectangle",
+                action = "fill",
+                fillColor = { red = 0.85, green = 0.1, blue = 0.12, alpha = 0.28 },
+            },
+            {
+                type = "text",
+                text = "Focus — get back to work",
+                textColor = { white = 1, alpha = 0.96 },
+                textFont = ".AppleSystemUIFontBold",
+                textSize = 54,
+                textAlignment = "center",
+                frame = { x = 0, y = f.h / 2 - 60, w = f.w, h = 120 },
+            },
+        })
+        self._flashCanvas = c
+    end
+
+    self._flashCanvas:show()
+    self._flashTimer = hs.timer.doAfter(self.flashDurationSec, function()
+        if self._flashCanvas then self._flashCanvas:hide() end
+        self._flashTimer = nil
+    end)
+end
+
+-- Key of the current focus target: "tab:<url>" for browsers, "win:<id>" otherwise.
+function obj:_currentKey()
+    local win = hs.window.focusedWindow()
+    if not win then return nil end
+    local app = win:application()
+    local name = app and app:name()
+    if name and BROWSERS[name] then
+        local url = activeTabUrl(name)
+        return url and ("tab:" .. url) or nil
+    end
+    local id = win:id()
+    return id and ("win:" .. tostring(id)) or nil
+end
+
+-- Flash when focus lands on something outside the allowed set. Polled, so we
+-- only flash on entering a new disallowed target to avoid spamming each tick.
+function obj:_checkFocus()
+    if not (self._allowedKeys and next(self._allowedKeys)) then return end
+    local key = self:_currentKey()
+    if not key then return end
+    if self._allowedKeys[key] then
+        self._lastBadKey = nil
+        return
+    end
+    if key == self._lastBadKey then return end
+    self._lastBadKey = key
+    self:_flashFocus()
+end
+
+function obj:_startFocusGuard()
+    self:_stopFocusGuard()
+    if not (self._allowedKeys and next(self._allowedKeys)) then return end
+
+    -- Polling is required: switching browser tabs fires no window-focus event,
+    -- and the active tab can only be read via AppleScript.
+    self._guardTimer = hs.timer.doEvery(self.guardIntervalSec, function()
+        self:_checkFocus()
+    end)
+end
+
+function obj:_stopFocusGuard()
+    if self._guardTimer then
+        self._guardTimer:stop()
+        self._guardTimer = nil
+    end
+    if self._flashTimer then
+        self._flashTimer:stop()
+        self._flashTimer = nil
+    end
+    if self._flashCanvas then
+        self._flashCanvas:delete()
+        self._flashCanvas = nil
+    end
 end
 
 function obj:_renderProgress()
@@ -381,7 +741,7 @@ function obj:_finish()
     end
 end
 
-function obj:startTimer(title, minutes)
+function obj:startTimer(title, minutes, allowed)
     minutes = tonumber(minutes) or 25
     if minutes ~= 5 and minutes ~= 15 and minutes ~= 25 then minutes = 25 end
     title = trim(title)
@@ -394,6 +754,7 @@ function obj:startTimer(title, minutes)
     self._durationSec = minutes * 60
     self._startedAt = hs.timer.secondsSinceEpoch()
     self._finishAt = self._startedAt + self._durationSec
+    self._allowedKeys = parseAllowed(allowed)
 
     self._canvas = hs.canvas.new(frameBelowNotch(self.width, self.height))
     self._canvas:level(hs.canvas.windowLevels.overlay)
@@ -408,6 +769,7 @@ function obj:startTimer(title, minutes)
     end)
 
     self:_renderProgress()
+    self:_startFocusGuard()
     self._timer = hs.timer.doEvery(self.updateIntervalSec, function()
         if hs.timer.secondsSinceEpoch() >= self._finishAt then
             self:_finish()
@@ -425,7 +787,7 @@ function obj:showInput()
         :allowTextEntry(true)
         :transparent(true)
         :shadow(true)
-        :html(inputHtml())
+        :html(inputHtml(hs.json.encode(listItems())))
 
     view:policyCallback(function(action, _, request)
         if action ~= "navigationAction" then return true end
@@ -438,7 +800,7 @@ function obj:showInput()
 
         if normalizedUrl:match("^hammerspoon://pomodorostart") then
             local params = parseQuery(url)
-            self:startTimer(params.title, params.minutes)
+            self:startTimer(params.title, params.minutes, params.allowed)
             return false
         end
 
@@ -490,7 +852,7 @@ end
 
 function obj:start()
     local startHandler = function(_, params)
-        self:startTimer(urlDecode(params.title), params.minutes)
+        self:startTimer(urlDecode(params.title), params.minutes, params.allowed)
     end
     local cancelHandler = function()
         self:_hideInput()
