@@ -245,63 +245,41 @@ function obj:start()
             strokeWidth = 0.5,
         }
 
-        local x, y = 60, 10
-        local function add_segment(count, label, color, width)
-            c[#c + 1] = {
-                type = "text",
-                id = "seg_count",
-                trackMouseDown = true,
-                text = tostring(count),
-                textColor = color,
-                textSize = 22,
-                textFont = "Menlo-Bold",
-                frame = { x = x, y = y - 1, w = 36, h = 28 },
-            }
-            c[#c + 1] = {
-                type = "text",
-                id = "seg_label",
-                trackMouseDown = true,
-                text = label,
-                textColor = { white = 0.86, alpha = 1 },
-                textSize = 20,
-                textFont = ".AppleSystemUIFont",
-                frame = { x = x + 28, y = y + 1, w = width - 28, h = 26 },
-            }
-            x = x + width
+        -- Render the whole readout as one styledtext line. Canvas lays out each
+        -- text element from the top of its own frame, so mixing the size-22 bold
+        -- counts, size-20 system-font labels, and size-20 separators as separate
+        -- elements left them on different baselines. Within a single styledtext
+        -- run the text engine computes one shared baseline, so everything sits on
+        -- the same line regardless of per-run size, font, or color.
+        local labelColor = { white = 0.86, alpha = 1 }
+        local sepColor   = { white = 0.58, alpha = 1 }
+        local function run(text, size, font, color)
+            return hs.styledtext.new(text, { font = { name = font, size = size }, color = color })
         end
-
-        add_segment(working, "running", { red = 0.25, green = 0.95, blue = 0.40, alpha = 1 }, 118)
+        local function segment(count, label, color)
+            return run(tostring(count) .. " ", 22, "Menlo-Bold", color)
+                .. run(label, 20, ".AppleSystemUIFont", labelColor)
+        end
+        local sep = run("   ·   ", 20, "Menlo", sepColor)
+        local line = segment(working, "running", { red = 0.25, green = 0.95, blue = 0.40, alpha = 1 })
+            .. sep .. segment(waiting, "needs you", { red = 1.00, green = 0.60, blue = 0.05, alpha = 1 })
+            .. sep .. segment(idle, "done", { white = 0.78, alpha = 1 })
         c[#c + 1] = {
             type = "text",
+            id = "bar_line",
             trackMouseDown = true,
-            text = "·",
-            textColor = { white = 0.58, alpha = 1 },
-            textSize = 20,
-            textFont = "Menlo",
-            frame = { x = x, y = y + 1, w = 18, h = 26 },
+            text = line,
+            frame = { x = 56, y = 11, w = frame.w - 56 - 38, h = 28 },
         }
-        x = x + 28
-        add_segment(waiting, "needs you", { red = 1.00, green = 0.60, blue = 0.05, alpha = 1 }, 148)
-        c[#c + 1] = {
-            type = "text",
-            trackMouseDown = true,
-            text = "·",
-            textColor = { white = 0.58, alpha = 1 },
-            textSize = 20,
-            textFont = "Menlo",
-            frame = { x = x, y = y + 1, w = 18, h = 26 },
-        }
-        x = x + 28
-        add_segment(idle, "done", { white = 0.78, alpha = 1 }, 96)
         c[#c + 1] = {
             type = "text",
             trackMouseDown = true,
             text = panel and "⌃" or "⌄",
-            textColor = { white = 0.58, alpha = 1 },
+            textColor = sepColor,
             textSize = 19,
             textFont = "Menlo-Bold",
             textAlignment = "center",
-            frame = { x = frame.w - 50, y = y + 1, w = 24, h = 26 },
+            frame = { x = frame.w - 50, y = 12, w = 24, h = 24 },
         }
         c:mouseCallback(function(_, evt)
             if evt == "mouseDown" and toggle_panel then toggle_panel() end
