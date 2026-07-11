@@ -40,6 +40,7 @@ obj._dragTap = nil
 obj._allowedKeys = nil
 obj._guardTimer = nil
 obj._flashCanvas = nil
+obj._flashFrame = nil
 obj._distractedSec = 0
 
 -- hs.settings key under which a running timer is persisted, so it survives a
@@ -603,15 +604,34 @@ end
 -- Translucent full-screen red overlay nudging the user back to an allowed window.
 -- Stays up for as long as focus remains on a disallowed target.
 function obj:_showFocus()
-    if not self._flashCanvas then
-        local f = activeScreen():fullFrame()
-        local btnW, btnH = 380, 54
-        local btn = { x = (f.w - btnW) / 2, y = f.h / 2 + 60, w = btnW, h = btnH }
-        local c = applyOverlay(hs.canvas.new(f))
-        -- Don't activate Hammerspoon on click, so the disallowed window stays
-        -- frontmost and _currentKey resolves it correctly when the button is hit.
-        c:clickActivating(false)
-        c:replaceElements({
+    local f = activeScreen():fullFrame()
+    -- Rebuild when missing or when the active screen changed, so the overlay and
+    -- its button always land on the screen the user is actually looking at.
+    if not (self._flashCanvas and self._flashFrame and self._flashFrame.x == f.x
+        and self._flashFrame.y == f.y and self._flashFrame.w == f.w
+        and self._flashFrame.h == f.h) then
+        if self._flashCanvas then self._flashCanvas:delete() end
+        self._flashCanvas = self:_buildFocusCanvas(f)
+        self._flashFrame = f
+    end
+
+    self._flashCanvas:show()
+    -- Reassert top-most so a window that came forward since creation can't sit
+    -- over the button and swallow the click.
+    self._flashCanvas:level(hs.canvas.windowLevels.screenSaver)
+end
+
+function obj:_buildFocusCanvas(f)
+    local btnW, btnH = 380, 54
+    local btn = { x = (f.w - btnW) / 2, y = f.h / 2 + 60, w = btnW, h = btnH }
+    local c = applyOverlay(hs.canvas.new(f))
+    -- Above all normal (and fullscreen) app windows so the button is clickable;
+    -- the shared "overlay" level can end up behind some app windows.
+    c:level(hs.canvas.windowLevels.screenSaver)
+    -- Don't activate Hammerspoon on click, so the disallowed window stays
+    -- frontmost and _currentKey resolves it correctly when the button is hit.
+    c:clickActivating(false)
+    c:replaceElements({
             {
                 type = "rectangle",
                 action = "fill",
@@ -649,16 +669,13 @@ function obj:_showFocus()
                 frame = { x = btn.x, y = btn.y + 15, w = btn.w, h = 26 },
             },
         })
-        c:mouseCallback(function(_, event, elementId)
-            if event == "mouseDown"
-                and (elementId == "allowBtn" or elementId == "allowBtnLabel") then
-                self:_allowCurrent()
-            end
-        end)
-        self._flashCanvas = c
-    end
-
-    self._flashCanvas:show()
+    c:mouseCallback(function(_, event, elementId)
+        if event == "mouseDown"
+            and (elementId == "allowBtn" or elementId == "allowBtnLabel") then
+            self:_allowCurrent()
+        end
+    end)
+    return c
 end
 
 -- Add the currently-focused target to the allowed set for the rest of the
@@ -727,6 +744,7 @@ function obj:_stopFocusGuard()
         self._flashCanvas:delete()
         self._flashCanvas = nil
     end
+    self._flashFrame = nil
 end
 
 function obj:_renderProgress()
