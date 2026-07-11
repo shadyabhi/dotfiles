@@ -23,8 +23,10 @@ obj.inputWidth = 420
 obj.inputHeight = 514
 obj.updateIntervalSec = 1
 obj.completeSound = nil
-obj.flashDurationSec = 1.4
 obj.guardIntervalSec = 1
+
+-- Apps whose open windows/tabs start pre-checked (implicitly selected) in the picker.
+obj.autoSelectApps = { Obsidian = true }
 
 obj._hotkey = nil
 obj._webview = nil
@@ -37,9 +39,12 @@ obj._title = nil
 obj._dragTap = nil
 obj._allowedKeys = nil
 obj._guardTimer = nil
-obj._lastBadKey = nil
 obj._flashCanvas = nil
-obj._flashTimer = nil
+obj._distractedSec = 0
+
+-- hs.settings key under which a running timer is persisted, so it survives a
+-- Hammerspoon reload/restart.
+local SETTINGS_KEY = "spoon.Pomodoro.state"
 
 local function activeScreen()
     local fw = hs.window.focusedWindow()
@@ -54,6 +59,25 @@ local function frameBelowNotch(w, h)
         w = w,
         h = h,
     }
+end
+
+-- Apply the shared overlay stacking + all-spaces behavior to a canvas or webview.
+local function applyOverlay(surface)
+    surface:level(hs.canvas.windowLevels.overlay)
+    surface:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
+        + hs.canvas.windowBehaviors.stationary)
+    return surface
+end
+
+-- Stable focus-target keys, shared by the picker (listItems) and the focus guard
+-- (_currentKey) so both sides encode windows/tabs identically.
+local function keyForWindow(win)
+    local id = win:id()
+    return id and ("win:" .. tostring(id)) or nil
+end
+
+local function keyForTabUrl(url)
+    return "tab:" .. url
 end
 
 local function trim(str)
@@ -164,25 +188,28 @@ end
 -- Each item carries a stable `key`: "win:<id>" for windows, "tab:<url>" for tabs.
 local function listItems()
     local items = {}
+    -- orderedWindows() is front-to-back z-order, i.e. most-recently-focused first.
     for _, w in ipairs(hs.window.orderedWindows()) do
         local app = w:application()
         local appName = (app and app:name()) or "?"
         if w:isStandard() and w:title() ~= ""
             and appName ~= "Hammerspoon" and not BROWSERS[appName] then
             items[#items + 1] = {
-                key = "win:" .. tostring(w:id()),
+                key = keyForWindow(w),
                 app = appName,
                 title = w:title(),
                 kind = "window",
+                selected = obj.autoSelectApps[appName],
             }
         end
     end
     for _, t in ipairs(listBrowserTabs()) do
         items[#items + 1] = {
-            key = "tab:" .. t.url,
+            key = keyForTabUrl(t.url),
             app = t.app,
             title = t.title,
             kind = "tab",
+            selected = obj.autoSelectApps[t.app],
         }
     end
     return items
@@ -427,6 +454,7 @@ local function inputHtml(windowsJson)
             cb.type = "checkbox";
             cb.className = "win-check";
             cb.value = item.key;
+            cb.checked = !!item.selected;
             const span = document.createElement("span");
             const app = document.createElement("strong");
             const tag = document.createElement("i");
@@ -511,9 +539,13 @@ end
 
 function obj:_hideInput()
     self:_stopDrag()
-    if self._webview then
-        self._webview:delete()
+    local view = self._webview
+    if view then
         self._webview = nil
+        -- Defer destruction: _hideInput is called from inside the webview's own
+        -- navigation callback (Start/Cancel), and deleting a webview mid-navigation
+        -- stalls WebKit. Returning first, then deleting, avoids the UI hang.
+        hs.timer.doAfter(0, function() view:delete() end)
     end
 end
 
@@ -565,22 +597,20 @@ function obj:_stopTimer()
     self._durationSec = nil
     self._title = nil
     self._allowedKeys = nil
-    self._lastBadKey = nil
+    self:_clearState()
 end
 
--- Translucent full-screen red flash nudging the user back to an allowed window.
-function obj:_flashFocus()
-    if self._flashTimer then
-        self._flashTimer:stop()
-        self._flashTimer = nil
-    end
-
+-- Translucent full-screen red overlay nudging the user back to an allowed window.
+-- Stays up for as long as focus remains on a disallowed target.
+function obj:_showFocus()
     if not self._flashCanvas then
         local f = activeScreen():fullFrame()
-        local c = hs.canvas.new(f)
-        c:level(hs.canvas.windowLevels.overlay)
-        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
-            + hs.canvas.windowBehaviors.stationary)
+        local btnW, btnH = 380, 54
+        local btn = { x = (f.w - btnW) / 2, y = f.h / 2 + 60, w = btnW, h = btnH }
+        local c = applyOverlay(hs.canvas.new(f))
+        -- Don't activate Hammerspoon on click, so the disallowed window stays
+        -- frontmost and _currentKey resolves it correctly when the button is hit.
+        c:clickActivating(false)
         c:replaceElements({
             {
                 type = "rectangle",
@@ -589,22 +619,62 @@ function obj:_flashFocus()
             },
             {
                 type = "text",
-                text = "Focus — get back to work",
+                text = "Focus - Get back to work",
                 textColor = { white = 1, alpha = 0.96 },
                 textFont = ".AppleSystemUIFontBold",
                 textSize = 54,
                 textAlignment = "center",
                 frame = { x = 0, y = f.h / 2 - 60, w = f.w, h = 120 },
             },
+            {
+                type = "rectangle",
+                id = "allowBtn",
+                action = "fill",
+                trackMouseDown = true,
+                roundedRectRadii = { xRadius = 10, yRadius = 10 },
+                fillColor = { white = 1, alpha = 0.16 },
+                strokeColor = { white = 1, alpha = 0.5 },
+                strokeWidth = 1,
+                frame = btn,
+            },
+            {
+                type = "text",
+                id = "allowBtnLabel",
+                text = "Add this window to my session",
+                trackMouseDown = true,
+                textColor = { white = 1, alpha = 0.96 },
+                textFont = ".AppleSystemUIFontBold",
+                textSize = 18,
+                textAlignment = "center",
+                frame = { x = btn.x, y = btn.y + 15, w = btn.w, h = 26 },
+            },
         })
+        c:mouseCallback(function(_, event, elementId)
+            if event == "mouseDown"
+                and (elementId == "allowBtn" or elementId == "allowBtnLabel") then
+                self:_allowCurrent()
+            end
+        end)
         self._flashCanvas = c
     end
 
     self._flashCanvas:show()
-    self._flashTimer = hs.timer.doAfter(self.flashDurationSec, function()
-        if self._flashCanvas then self._flashCanvas:hide() end
-        self._flashTimer = nil
-    end)
+end
+
+-- Add the currently-focused target to the allowed set for the rest of the
+-- session, persist it, and drop the overlay.
+function obj:_allowCurrent()
+    if not self._allowedKeys then return end
+    local key = self:_currentKey()
+    if not key then return end
+    self._allowedKeys[key] = true
+    self:_saveState()
+    self:_hideFocus()
+end
+
+-- Hide the overlay once focus is back on an allowed target.
+function obj:_hideFocus()
+    if self._flashCanvas then self._flashCanvas:hide() end
 end
 
 -- Key of the current focus target: "tab:<url>" for browsers, "win:<id>" otherwise.
@@ -615,25 +685,26 @@ function obj:_currentKey()
     local name = app and app:name()
     if name and BROWSERS[name] then
         local url = activeTabUrl(name)
-        return url and ("tab:" .. url) or nil
+        return url and keyForTabUrl(url) or nil
     end
-    local id = win:id()
-    return id and ("win:" .. tostring(id)) or nil
+    return keyForWindow(win)
 end
 
--- Flash when focus lands on something outside the allowed set. Polled, so we
--- only flash on entering a new disallowed target to avoid spamming each tick.
+-- Keep the overlay visible while focus is outside the allowed set, and hide it
+-- as soon as focus returns to an allowed target. Polled every guard tick;
+-- _startFocusGuard already guarantees a non-empty allowed set before starting.
 function obj:_checkFocus()
-    if not (self._allowedKeys and next(self._allowedKeys)) then return end
     local key = self:_currentKey()
     if not key then return end
     if self._allowedKeys[key] then
-        self._lastBadKey = nil
+        self:_hideFocus()
         return
     end
-    if key == self._lastBadKey then return end
-    self._lastBadKey = key
-    self:_flashFocus()
+    -- Count each guard tick spent on a disallowed target as distraction time,
+    -- then persist it (the only field that changes while the timer runs).
+    self._distractedSec = self._distractedSec + self.guardIntervalSec
+    self:_saveState()
+    self:_showFocus()
 end
 
 function obj:_startFocusGuard()
@@ -651,10 +722,6 @@ function obj:_stopFocusGuard()
     if self._guardTimer then
         self._guardTimer:stop()
         self._guardTimer = nil
-    end
-    if self._flashTimer then
-        self._flashTimer:stop()
-        self._flashTimer = nil
     end
     if self._flashCanvas then
         self._flashCanvas:delete()
@@ -728,6 +795,15 @@ function obj:_renderProgress()
             textAlignment = "center",
             frame = { x = pad, y = 65, w = barW, h = 16 },
         },
+        {
+            type = "text",
+            text = "distracted " .. fmtRemaining(self._distractedSec),
+            textColor = { red = 1, green = 0.55, blue = 0.55, alpha = 0.75 },
+            textFont = "Menlo",
+            textSize = 12,
+            textAlignment = "left",
+            frame = { x = pad, y = 65, w = barW, h = 16 },
+        },
     })
 end
 
@@ -755,11 +831,15 @@ function obj:startTimer(title, minutes, allowed)
     self._startedAt = hs.timer.secondsSinceEpoch()
     self._finishAt = self._startedAt + self._durationSec
     self._allowedKeys = parseAllowed(allowed)
+    self._distractedSec = 0
 
-    self._canvas = hs.canvas.new(frameBelowNotch(self.width, self.height))
-    self._canvas:level(hs.canvas.windowLevels.overlay)
-    self._canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
-        + hs.canvas.windowBehaviors.stationary)
+    self:_beginTimer()
+end
+
+-- Build the banner, focus guard, and tick timer from the currently-set timer
+-- fields. Shared by a fresh startTimer and by _restoreState after a reload.
+function obj:_beginTimer()
+    self._canvas = applyOverlay(hs.canvas.new(frameBelowNotch(self.width, self.height)))
     self._canvas:alpha(0.98)
     self._canvas:show()
     self._canvas:mouseCallback(function(_, event, elementId)
@@ -770,6 +850,10 @@ function obj:startTimer(title, minutes, allowed)
 
     self:_renderProgress()
     self:_startFocusGuard()
+    self:_saveState()
+    -- The tick only advances the visible countdown. Persistence is handled at
+    -- start (above) and whenever _distractedSec changes (in _checkFocus), so no
+    -- per-second settings write is needed here.
     self._timer = hs.timer.doEvery(self.updateIntervalSec, function()
         if hs.timer.secondsSinceEpoch() >= self._finishAt then
             self:_finish()
@@ -777,6 +861,46 @@ function obj:startTimer(title, minutes, allowed)
             self:_renderProgress()
         end
     end)
+end
+
+-- Persist the running timer so it can be resumed after a Hammerspoon reload.
+-- _finishAt/_startedAt are absolute epoch times, so remaining time is recomputed
+-- against the wall clock on restore regardless of how long Hammerspoon was down.
+function obj:_saveState()
+    if not (self._finishAt and self._startedAt and self._durationSec) then return end
+    -- _allowedKeys is a string-keyed set; hs.settings persists it as a plist dict.
+    hs.settings.set(SETTINGS_KEY, {
+        title = self._title,
+        durationSec = self._durationSec,
+        startedAt = self._startedAt,
+        finishAt = self._finishAt,
+        distractedSec = self._distractedSec,
+        allowed = self._allowedKeys or {},
+    })
+end
+
+function obj:_clearState()
+    hs.settings.clear(SETTINGS_KEY)
+end
+
+-- Resume a persisted timer if one is still running; otherwise discard it.
+function obj:_restoreState()
+    local s = hs.settings.get(SETTINGS_KEY)
+    if not (s and s.finishAt and s.startedAt and s.durationSec) then return end
+    if hs.timer.secondsSinceEpoch() >= s.finishAt then
+        -- The session already elapsed while Hammerspoon was down.
+        self:_clearState()
+        return
+    end
+
+    self._title = s.title
+    self._durationSec = s.durationSec
+    self._startedAt = s.startedAt
+    self._finishAt = s.finishAt
+    self._distractedSec = s.distractedSec or 0
+    self._allowedKeys = s.allowed or {}
+
+    self:_beginTimer()
 end
 
 function obj:showInput()
@@ -800,6 +924,8 @@ function obj:showInput()
 
         if normalizedUrl:match("^hammerspoon://pomodorostart") then
             local params = parseQuery(url)
+            -- startTimer tears down this webview via _hideInput, which now defers
+            -- the delete, so it is safe to call directly from the callback.
             self:startTimer(params.title, params.minutes, params.allowed)
             return false
         end
@@ -817,9 +943,7 @@ function obj:showInput()
         return true
     end)
 
-    view:level(hs.canvas.windowLevels.overlay)
-    view:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
-        + hs.canvas.windowBehaviors.stationary)
+    applyOverlay(view)
     view:show()
     hs.timer.doAfter(0.05, function()
         if self._webview then self._webview:hswindow():focus() end
@@ -867,6 +991,8 @@ function obj:start()
     self._hotkey = hs.hotkey.bind(self.hotkey[1], self.hotkey[2], function()
         self:toggle()
     end)
+
+    self:_restoreState()
     return self
 end
 
