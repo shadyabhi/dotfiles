@@ -1,8 +1,10 @@
 --- === AgentSessions ===
 ---
---- Menubar widget for agent session status. Polls a JSON-emitting script.
---- Menubar click opens chooser; hotkey toggles canvas panel; panel auto-shows
---- when any session needs user input. Selecting a row focuses its tmux pane.
+--- Menubar (system tray) widget for agent session status. Polls a
+--- JSON-emitting script. The title shows only non-zero status counts.
+--- Menubar click and hotkey both toggle the canvas panel; the panel also
+--- auto-shows when any session needs user input. Selecting a row focuses its
+--- tmux pane.
 
 local obj = {}
 obj.__index = obj
@@ -23,10 +25,6 @@ obj.script = nil
 obj.tmuxSocket = "/private/tmp/tmux-" .. UID .. "/default"
 obj.hotkey = nil
 
-obj.theme = {
-    statusIcon = { Input = "🔔", Working = "🤔", Idle = "💤" },
-}
-
 local state = {}
 
 function obj:configure(opts)
@@ -37,9 +35,6 @@ function obj:configure(opts)
     if opts.terminalApp then self.terminalApp = opts.terminalApp end
     if opts.tmuxSocket then self.tmuxSocket = opts.tmuxSocket end
     if opts.hotkey then self.hotkey = opts.hotkey end
-    if opts.theme then
-        for k, v in pairs(opts.theme) do self.theme[k] = v end
-    end
     return self
 end
 
@@ -51,7 +46,6 @@ local function teardown_prior()
         if s.blink_timer then s.blink_timer:stop() end
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
-        if s.status_bar then s.status_bar:delete() end
         if s.hotkey then s.hotkey:delete() end
         for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
             if s[k] then s[k]:delete() end
@@ -101,37 +95,46 @@ function obj:start()
     state = {}
     _G._agent_sessions_state = state
 
-    local theme = self.theme
     local in_flight, in_flight_started = nil, 0
 
     local bar = hs.menubar.new()
     bar:setTitle("…")
     state.bar = bar
 
-    local last_summary, last_blocked, last_working = "", 0, 0
+    local last_blocked, last_working, last_idle = 0, 0, 0
     local blink_on, last_sessions = true, {}
     local panel_auto_shown = false
     local dismissed_tokens = {}   -- per-question tokens the user dismissed and that are still pending
     local waiting_now = {}        -- tokens of sessions waiting on the latest refresh (for dismiss bookkeeping)
     local last_sig = ""           -- signature of the waiting set, to detect changes
 
+    -- Concise title: only non-zero counts appear, in 🔔/🤔/💤 priority order.
+    -- The 🔔 segment blinks red↔dim while any session is blocked. When nothing
+    -- is running, waiting, or idle, collapse to a single 💤 so the tray icon
+    -- never goes blank.
     local function render_title()
-        if last_blocked == 0 then
-            bar:setTitle(last_summary)
+        local font = { name = ".AppleSystemUIFont", size = 14 }
+        if last_blocked == 0 and last_working == 0 and last_idle == 0 then
+            bar:setTitle(hs.styledtext.new("💤", { font = font }))
             return
         end
-        local rest = last_summary:match("^🔔%d+(.*)$") or ""
-        local blocked_part = "🔔" .. last_blocked
-        local color = blink_on
-            and { red = 1, green = 0.15, blue = 0.15, alpha = 1 }
-            or  { red = 1, green = 1,    blue = 1,    alpha = 0.45 }
-        local styled = hs.styledtext.new(blocked_part, {
-            color = color,
-            font  = { name = ".AppleSystemUIFont", size = 14 },
-        }) .. hs.styledtext.new(rest, {
-            font  = { name = ".AppleSystemUIFont", size = 14 },
-        })
-        bar:setTitle(styled)
+        local title = nil
+        local function append(st)
+            title = title and (title .. hs.styledtext.new(" ", { font = font }) .. st) or st
+        end
+        if last_blocked > 0 then
+            local color = blink_on
+                and { red = 1, green = 0.15, blue = 0.15, alpha = 1 }
+                or  { red = 1, green = 1,    blue = 1,    alpha = 0.45 }
+            append(hs.styledtext.new("🔔" .. last_blocked, { color = color, font = font }))
+        end
+        if last_working > 0 then
+            append(hs.styledtext.new("🤔" .. last_working, { font = font }))
+        end
+        if last_idle > 0 then
+            append(hs.styledtext.new("💤" .. last_idle, { font = font }))
+        end
+        bar:setTitle(title)
     end
 
     local function focus_pane(pane)
@@ -202,92 +205,8 @@ function obj:start()
 
     local panel = nil
     local panel_origin = nil
-    local status_bar = nil
     local maybe_auto_panel  -- forward decl, defined after show_panel
     local toggle_panel      -- forward decl, defined after show_panel
-
-    local function status_bar_frame()
-        local sf = hs.screen.mainScreen():fullFrame()
-        local W, H = math.min(560, sf.w), 46
-        return {
-            x = sf.x,
-            y = sf.y + sf.h - H,
-            w = W,
-            h = H,
-        }
-    end
-
-    local function render_status_bar(sessions, waiting, working)
-        local idle = math.max(0, #sessions - waiting - working)
-        local frame = status_bar_frame()
-        if status_bar then status_bar:delete(); status_bar = nil; state.status_bar = nil end
-
-        local c = hs.canvas.new(frame)
-        c:level(hs.canvas.windowLevels.overlay)
-        c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
-        c[1] = {
-            type = "rectangle",
-            id = "bar_bg",
-            trackMouseDown = true,
-            roundedRectRadii = { xRadius = 12, yRadius = 12 },
-            fillColor = { red = 0.10, green = 0.12, blue = 0.13, alpha = 0.94 },
-            strokeColor = { red = 0.24, green = 0.26, blue = 0.27, alpha = 0.85 },
-            strokeWidth = 1,
-        }
-        c[2] = {
-            type = "rectangle",
-            id = "bar_pulse",
-            trackMouseDown = true,
-            frame = { x = 22, y = 12, w = 22, h = 22 },
-            roundedRectRadii = { xRadius = 11, yRadius = 11 },
-            fillColor = { red = 0.25, green = 0.95, blue = 0.40, alpha = working > 0 and 1 or 0.30 },
-            strokeColor = { white = 1, alpha = 0.18 },
-            strokeWidth = 0.5,
-        }
-
-        -- Render the whole readout as one styledtext line. Canvas lays out each
-        -- text element from the top of its own frame, so mixing the size-22 bold
-        -- counts, size-20 system-font labels, and size-20 separators as separate
-        -- elements left them on different baselines. Within a single styledtext
-        -- run the text engine computes one shared baseline, so everything sits on
-        -- the same line regardless of per-run size, font, or color.
-        local labelColor = { white = 0.86, alpha = 1 }
-        local sepColor   = { white = 0.58, alpha = 1 }
-        local function run(text, size, font, color)
-            return hs.styledtext.new(text, { font = { name = font, size = size }, color = color })
-        end
-        local function segment(count, label, color)
-            return run(tostring(count) .. " ", 22, "Menlo-Bold", color)
-                .. run(label, 20, ".AppleSystemUIFont", labelColor)
-        end
-        local sep = run("   ·   ", 20, "Menlo", sepColor)
-        local line = segment(working, "running", { red = 0.25, green = 0.95, blue = 0.40, alpha = 1 })
-            .. sep .. segment(waiting, "needs you", { red = 1.00, green = 0.60, blue = 0.05, alpha = 1 })
-            .. sep .. segment(idle, "done", { white = 0.78, alpha = 1 })
-        c[#c + 1] = {
-            type = "text",
-            id = "bar_line",
-            trackMouseDown = true,
-            text = line,
-            frame = { x = 56, y = 11, w = frame.w - 56 - 38, h = 28 },
-        }
-        c[#c + 1] = {
-            type = "text",
-            trackMouseDown = true,
-            text = panel and "⌃" or "⌄",
-            textColor = sepColor,
-            textSize = 19,
-            textFont = "Menlo-Bold",
-            textAlignment = "center",
-            frame = { x = frame.w - 50, y = 12, w = 24, h = 24 },
-        }
-        c:mouseCallback(function(_, evt)
-            if evt == "mouseDown" and toggle_panel then toggle_panel() end
-        end)
-        c:show()
-        status_bar = c
-        state.status_bar = c
-    end
 
     local function apply_data(data)
         local sessions = data.details
@@ -300,50 +219,21 @@ function obj:start()
                 working = working + 1
             end
         end
-        last_summary = data.summary
         last_blocked = waiting
         last_working = working
+        last_idle = math.max(0, #sessions - waiting - working)
         render_title()
         bar:setTooltip(#sessions .. " session(s) · " .. waiting .. " waiting")
         caffeinate_set(state, working > 0)
         last_sessions = sessions
-        render_status_bar(sessions, waiting, working)
         if maybe_auto_panel then maybe_auto_panel(waiting_sessions) end
     end
 
-    local chooser = hs.chooser.new(function(choice)
-        if choice and choice.pane_target then focus_pane(choice.pane_target) end
+    -- Click the tray icon to toggle the detail panel (defined below). The panel
+    -- also auto-shows when a session needs input and via the optional hotkey.
+    bar:setClickCallback(function()
+        if toggle_panel then toggle_panel() end
     end)
-    chooser:searchSubText(true)
-    state.chooser = chooser
-
-    local function show_chooser()
-        local choices = {}
-        for _, s in ipairs(last_sessions) do
-            local icon = theme.statusIcon[s.status] or "❓"
-            local agent = s.agent or "Agent"
-            local label = agent .. " · " .. (s.project_name or "?")
-            if s.session_name then
-                label = label .. " · " .. s.session_name
-            elseif s.room_id then
-                label = label .. " · " .. s.room_id
-            end
-            local sub = (s.status or "") .. " · " .. (s.model_display or "") .. " · " .. (s.context_display or "")
-            choices[#choices + 1] = {
-                text        = icon .. " " .. label,
-                subText     = sub,
-                pane_target = s.pane_target,
-            }
-        end
-        if #choices == 0 then
-            choices[1] = { text = "No active sessions", subText = "" }
-        end
-        chooser:choices(choices)
-        chooser:show()
-    end
-    state.show_chooser = show_chooser
-
-    bar:setClickCallback(function() show_chooser() end)
 
     local function hide_panel(reason)
         for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
@@ -354,7 +244,6 @@ function obj:start()
             if ok and tl then panel_origin = tl end
             panel:delete(); panel = nil; state.panel = nil
         end
-        render_status_bar(last_sessions, last_blocked, last_working)
         if reason == "user_dismiss" then
             for _, tok in ipairs(waiting_now) do dismissed_tokens[tok] = true end
         end
@@ -408,12 +297,13 @@ function obj:start()
         if #visible == 0 then contentH = contentH + headerH end
         contentH = contentH + pad
 
+        -- Anchor to the top-right under the tray icon. frame() (unlike
+        -- fullFrame()) already excludes the menubar, so sf.y sits just below it.
         local sf = hs.screen.mainScreen():frame()
-        local barFrame = status_bar_frame()
         local W = math.min(680, sf.w - 44)
         local H = math.min(math.max(contentH, 190), math.floor(sf.h * 0.72))
-        local x = math.max(sf.x + 22, barFrame.x + barFrame.w - W)
-        local y = math.max(sf.y + 22, barFrame.y - H - 10)
+        local x = math.max(sf.x + 22, sf.x + sf.w - W - 12)
+        local y = sf.y + 8
         local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
@@ -599,7 +489,6 @@ function obj:start()
         panel = c
         state.panel = c
         panel_auto_shown = was_auto and true or false
-        render_status_bar(last_sessions, last_blocked, last_working)
         state.panel_esc       = hs.hotkey.bind({}, "escape", function() hide_panel("user_dismiss") end)
         state.panel_up        = hs.hotkey.bind({}, "up",     function() set_selected(selected - 1) end)
         state.panel_down      = hs.hotkey.bind({}, "down",   function() set_selected(selected + 1) end)
