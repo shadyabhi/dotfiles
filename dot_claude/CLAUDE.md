@@ -37,3 +37,7 @@ Don't announce what you're about to say, narrate your intent, or justify a state
 ## Don't re-justify.
 
 Once you've stated something, don't add a clause that re-explains why it matters or what it implies. Trust the reader to follow.
+
+# Conversation
+
+- When I ask you to give me a command, also copy it to clipboard via pbcopy.
