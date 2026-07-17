@@ -50,6 +50,7 @@ packages:
     - gyb
     - haproxy
     - hurl
+    - imagemagick
     - instantgrep
     - jj
     - jq
