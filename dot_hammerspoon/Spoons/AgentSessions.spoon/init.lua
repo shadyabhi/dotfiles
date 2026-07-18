@@ -20,6 +20,7 @@ obj.terminalApp = "iTerm"
 
 local HOME = os.getenv("HOME")
 local UID = hs.execute("id -u 2>/dev/null"):gsub("%s+", "")
+local log = hs.logger.new("AgentSessions", "info")
 
 obj.script = nil
 obj.tmuxSocket = "/private/tmp/tmux-" .. UID .. "/default"
@@ -147,6 +148,21 @@ function obj:start()
         hs.execute(tmux .. " select-window -t '" .. win .. "' 2>/dev/null")
         hs.execute(tmux .. " select-pane -t '" .. pane .. "' 2>/dev/null")
         hs.application.launchOrFocus(self.terminalApp)
+    end
+
+    -- True when the user is already looking at this tmux pane: it is the active
+    -- pane of the active window in an attached session, AND the terminal app is
+    -- frontmost. Used to skip the auto-popup when the session is already visible.
+    local function pane_is_active(pane)
+        if not pane then return false end
+        local front = hs.application.frontmostApplication()
+        if not front or front:name() ~= self.terminalApp then return false end
+        local tmux = "/opt/homebrew/bin/tmux -S " .. self.tmuxSocket
+        local fmt = "#{session_attached}:#{window_active}:#{pane_active}"
+        local out = hs.execute(tmux .. " display-message -p -t '" .. pane
+            .. "' '" .. fmt .. "' 2>/dev/null") or ""
+        local att, win, pn = out:match("(%d+):(%d+):(%d+)")
+        return att ~= nil and tonumber(att) > 0 and win == "1" and pn == "1"
     end
 
     -- Non-tmux sessions (e.g. Claude in IntelliJ's or VS Code's built-in
@@ -508,11 +524,12 @@ function obj:start()
 
     maybe_auto_panel = function(waiting_sessions)
         -- Same waiting set the 🔔 count is built from; key each entry per-question.
-        local cur, tokens = {}, {}
+        local cur, tokens, pane_by_tok = {}, {}, {}
         for _, s in ipairs(waiting_sessions) do
             local tok = session_token(s)
             cur[tok] = true
             tokens[#tokens + 1] = tok
+            pane_by_tok[tok] = s.pane_target or false
         end
         waiting_now = tokens
         -- Drop dismissals for questions that are no longer pending, so the next
@@ -536,7 +553,22 @@ function obj:start()
         end
 
         if not panel then
-            if unseen then show_panel(true) end       -- new/undismissed question: auto-pop
+            if unseen then
+                -- If every undismissed question is on a tmux pane the user is
+                -- already looking at, there is nothing to surface: just log it.
+                local all_active = true
+                for _, tok in ipairs(tokens) do
+                    if not dismissed_tokens[tok] and not pane_is_active(pane_by_tok[tok]) then
+                        all_active = false
+                        break
+                    end
+                end
+                if all_active then
+                    if changed then log.i("waiting session already active; skipping popup") end
+                else
+                    show_panel(true)                   -- new/undismissed question: auto-pop
+                end
+            end
         elseif changed then
             show_panel(unseen and true or panel_auto_shown)  -- keep an open panel current
         end
