@@ -1,0 +1,4 @@
+# lazy.nvim rewrites this on every plugin update (and via the weekly
+# background auto-sync). Tracking it in chezmoi causes constant conflicts,
+# so it's left unmanaged and resolved per-machine.
+.config/nvim/lazy-lock.json
