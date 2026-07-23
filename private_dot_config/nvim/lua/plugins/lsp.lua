@@ -58,6 +58,39 @@ return {
         },
       })
 
+      -- PEP 723 inline scripts (`#!/usr/bin/env -S uv run --script`) declare their
+      -- deps in a `# /// script` block. `uv run` installs those into an ephemeral
+      -- env under ~/.cache/uv/environments-v2, which Pyright can't see, so imports
+      -- like `fastavro` show as unresolved. Point Pyright at that env's interpreter.
+      local function set_uv_script_interp(client, bufnr)
+        local name = vim.api.nvim_buf_get_name(bufnr)
+        if name == "" or vim.bo[bufnr].buftype ~= "" then
+          return
+        end
+        local head = vim.api.nvim_buf_get_lines(bufnr, 0, 30, false)
+        if not vim.tbl_contains(head, "# /// script") then
+          return
+        end
+        vim.system({ "uv", "python", "find", "--script", name }, { text = true }, function(out)
+          local interp = vim.trim(out.stdout or "")
+          if out.code ~= 0 or interp == "" then
+            return
+          end
+          vim.schedule(function()
+            client.settings = vim.tbl_deep_extend("force", client.settings or {}, {
+              python = { pythonPath = interp },
+            })
+            client:notify("workspace/didChangeConfiguration", { settings = client.settings })
+          end)
+        end)
+      end
+
+      vim.lsp.config("pyright", {
+        on_attach = function(client, bufnr)
+          set_uv_script_interp(client, bufnr)
+        end,
+      })
+
       vim.lsp.enable({ "pyright", "gopls", "rust_analyzer", "perlnavigator" })
 
       vim.api.nvim_create_autocmd("LspAttach", {
