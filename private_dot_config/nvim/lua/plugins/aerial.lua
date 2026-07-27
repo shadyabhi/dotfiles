@@ -6,7 +6,7 @@ return {
   },
   event = "VeryLazy",
   keys = {
-    { "<leader>a", "<cmd>AerialToggle!<cr>", desc = "Toggle Aerial outline" },
+    { "<leader>o", "<cmd>AerialToggle!<cr>", desc = "Toggle Aerial outline" },
   },
   opts = {
     layout = {
