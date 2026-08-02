@@ -5,6 +5,11 @@
 --- Menubar click and hotkey both toggle the canvas panel; the panel also
 --- auto-shows when any session needs user input. Selecting a row focuses its
 --- tmux pane.
+---
+--- By default a session needing input is focused directly and the panel is not
+--- shown at all; the panel is then only reachable by hotkey or tray click. A
+--- toggle at its bottom turns that off, restoring the auto-popup. The choice
+--- persists across reloads in hs.settings.
 
 local obj = {}
 obj.__index = obj
@@ -28,6 +33,23 @@ obj.hotkey = nil
 
 local state = {}
 
+-- Hotkeys that live only while the panel is open. Bound in show_panel, dropped
+-- in hide_panel, and swept by teardown_prior after a config reload.
+local PANEL_KEYS = {
+    "panel_esc", "panel_up", "panel_down",
+    "panel_enter", "panel_tab", "panel_shifttab", "panel_f",
+}
+
+local SETTING_AUTO_FOCUS = "AgentSessions.autoFocus"
+
+-- Focus the lone waiting session instead of popping the panel. Defaults on:
+-- an unset key is not the same as an explicit false.
+local function auto_focus_enabled()
+    local v = hs.settings.get(SETTING_AUTO_FOCUS)
+    if v == nil then return true end
+    return v and true or false
+end
+
 function obj:configure(opts)
     opts = opts or {}
     if opts.script then self.script = opts.script end
@@ -48,7 +70,7 @@ local function teardown_prior()
         if s.in_flight then pcall(function() s.in_flight:terminate() end) end
         if s.bar then s.bar:delete() end
         if s.hotkey then s.hotkey:delete() end
-        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+        for _, k in ipairs(PANEL_KEYS) do
             if s[k] then s[k]:delete() end
         end
         if s.panel then s.panel:delete() end
@@ -220,7 +242,6 @@ function obj:start()
     end
 
     local panel = nil
-    local panel_origin = nil
     local maybe_auto_panel  -- forward decl, defined after show_panel
     local toggle_panel      -- forward decl, defined after show_panel
 
@@ -252,12 +273,10 @@ function obj:start()
     end)
 
     local function hide_panel(reason)
-        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+        for _, k in ipairs(PANEL_KEYS) do
             if state[k] then state[k]:delete(); state[k] = nil end
         end
         if panel then
-            local ok, tl = pcall(function() return panel:topLeft() end)
-            if ok and tl then panel_origin = tl end
             panel:delete(); panel = nil; state.panel = nil
         end
         if reason == "user_dismiss" then
@@ -269,12 +288,7 @@ function obj:start()
 
     local function show_panel(was_auto)
         local prev = panel
-        local prev_tl = nil
-        if prev then
-            local ok, tl = pcall(function() return prev:topLeft() end)
-            if ok and tl then prev_tl = tl end
-        end
-        for _, k in ipairs({ "panel_esc", "panel_up", "panel_down", "panel_enter", "panel_tab", "panel_shifttab" }) do
+        for _, k in ipairs(PANEL_KEYS) do
             if state[k] then state[k]:delete(); state[k] = nil end
         end
         if prev then prev:delete(); panel = nil; state.panel = nil end
@@ -296,6 +310,7 @@ function obj:start()
         end
 
         local pad, rowH, headerH, sectionGap, previewH = 28, 48, 44, 14, 34
+        local toggleH, toggleGap = 34, 18
         local function has_preview(s)
             return s.status == "Input" and s.prompt_preview and s.prompt_preview ~= ""
         end
@@ -311,15 +326,15 @@ function obj:start()
             end
         end
         if #visible == 0 then contentH = contentH + headerH end
-        contentH = contentH + pad
+        contentH = contentH + toggleGap + toggleH + pad
 
-        -- Anchor to the top-right under the tray icon. frame() (unlike
-        -- fullFrame()) already excludes the menubar, so sf.y sits just below it.
+        -- Centred on the active screen. frame() (unlike fullFrame()) already
+        -- excludes the menubar, so the result never rides under it.
         local sf = hs.screen.mainScreen():frame()
         local W = math.min(680, sf.w - 44)
         local H = math.min(math.max(contentH, 190), math.floor(sf.h * 0.72))
-        local x = math.max(sf.x + 22, sf.x + sf.w - W - 12)
-        local y = sf.y + 8
+        local x = sf.x + math.floor((sf.w - W) / 2)
+        local y = sf.y + math.floor((sf.h - H) / 2)
         local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
         c:level(hs.canvas.windowLevels.overlay)
         c:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces + hs.canvas.windowBehaviors.stationary)
@@ -462,6 +477,57 @@ function obj:start()
             cursorY = cursorY + sectionGap
         end
 
+        -- Settings row, pinned to the panel's bottom edge rather than appended to
+        -- the content flow: when more sessions are listed than H can fit, the
+        -- rows overflow but the toggle stays reachable.
+        local toggleY = H - pad - toggleH
+        c[#c + 1] = {
+            type = "rectangle",
+            action = "fill",
+            frame = { x = pad, y = toggleY - math.floor(toggleGap / 2), w = W - 2 * pad, h = 1 },
+            fillColor = { white = 1, alpha = 0.12 },
+            strokeWidth = 0,
+        }
+        local toggleIdx = #c + 1
+        c[toggleIdx] = {
+            type = "rectangle",
+            id = "toggle_bg",
+            action = "fill",
+            trackMouseDown = true,
+            trackMouseEnterExit = true,
+            frame = { x = pad - 6, y = toggleY, w = W - 2 * (pad - 6), h = toggleH },
+            roundedRectRadii = { xRadius = 6, yRadius = 6 },
+            fillColor = { white = 1, alpha = 0 },
+            strokeWidth = 0,
+        }
+        local toggleTxtIdx = #c + 1
+        c[toggleTxtIdx] = {
+            type = "text",
+            id = "toggle_txt",
+            trackMouseDown = true,
+            trackMouseEnterExit = true,
+            text = "",
+            textSize = 17,
+            textFont = "Menlo",
+            frame = { x = pad, y = toggleY + 8, w = W - 2 * pad, h = toggleH },
+        }
+
+        -- Repaint just this element rather than rebuilding the panel: tearing the
+        -- canvas down and back up leaves the outgoing copy drawn on top for a
+        -- beat, so the label appears not to have changed at all.
+        local function render_toggle()
+            local on = auto_focus_enabled()
+            c[toggleTxtIdx].text = (on and "[✓]" or "[ ]") .. "  Auto-focus waiting session   (f)"
+            c[toggleTxtIdx].textColor = on and { red = 0.55, green = 0.85, blue = 0.55, alpha = 1 }
+                                            or { white = 0.55, alpha = 1 }
+        end
+        render_toggle()
+
+        local function flip_auto_focus()
+            hs.settings.set(SETTING_AUTO_FOCUS, not auto_focus_enabled())
+            render_toggle()
+        end
+
         local total = rowCount
         local selected = total > 0 and 1 or 0
 
@@ -496,6 +562,14 @@ function obj:start()
                     set_selected(idx)
                     activate()
                 end
+            elseif elemId:match("^toggle_") then
+                if evt == "mouseEnter" then
+                    c[toggleIdx].fillColor = { white = 1, alpha = 0.16 }
+                elseif evt == "mouseExit" then
+                    c[toggleIdx].fillColor = { white = 1, alpha = 0 }
+                elseif evt == "mouseDown" then
+                    flip_auto_focus()
+                end
             elseif elemId == "bg" and evt == "mouseDown" then
                 hide_panel("user_dismiss")
             end
@@ -511,6 +585,7 @@ function obj:start()
         state.panel_enter     = hs.hotkey.bind({}, "return", activate)
         state.panel_tab       = hs.hotkey.bind({}, "tab",    function() set_selected(selected % math.max(1, total) + 1) end)
         state.panel_shifttab  = hs.hotkey.bind({ "shift" }, "tab", function() set_selected((selected - 2) % math.max(1, total) + 1) end)
+        state.panel_f         = hs.hotkey.bind({}, "f", flip_auto_focus)
     end
 
     toggle_panel = function()
@@ -524,12 +599,12 @@ function obj:start()
 
     maybe_auto_panel = function(waiting_sessions)
         -- Same waiting set the 🔔 count is built from; key each entry per-question.
-        local cur, tokens, pane_by_tok = {}, {}, {}
+        local cur, tokens, sess_by_tok = {}, {}, {}
         for _, s in ipairs(waiting_sessions) do
             local tok = session_token(s)
             cur[tok] = true
             tokens[#tokens + 1] = tok
-            pane_by_tok[tok] = s.pane_target or false
+            sess_by_tok[tok] = s
         end
         waiting_now = tokens
         -- Drop dismissals for questions that are no longer pending, so the next
@@ -554,17 +629,28 @@ function obj:start()
 
         if not panel then
             if unseen then
-                -- If every undismissed question is on a tmux pane the user is
-                -- already looking at, there is nothing to surface: just log it.
-                local all_active = true
+                -- First question still needing attention: undismissed, and not
+                -- already on-screen in a focused pane. Each check costs a tmux
+                -- round-trip, so stop at the first hit.
+                local pending = nil
                 for _, tok in ipairs(tokens) do
-                    if not dismissed_tokens[tok] and not pane_is_active(pane_by_tok[tok]) then
-                        all_active = false
+                    if not dismissed_tokens[tok] and not pane_is_active(sess_by_tok[tok].pane_target) then
+                        pending = tok
                         break
                     end
                 end
-                if all_active then
+                if not pending then
                     if changed then log.i("waiting session already active; skipping popup") end
+                elseif auto_focus_enabled() then
+                    -- Go straight to the session; the panel never auto-opens. Only
+                    -- on a change of the waiting set, and marking the token
+                    -- dismissed, so focus is grabbed once per question instead of
+                    -- once per poll or bouncing between two waiting sessions.
+                    if changed then
+                        local s = sess_by_tok[pending]
+                        dismissed_tokens[pending] = true
+                        if s.pane_target then focus_pane(s.pane_target) else focus_app_for_pid(s.pid) end
+                    end
                 else
                     show_panel(true)                   -- new/undismissed question: auto-pop
                 end
