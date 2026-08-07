@@ -15,7 +15,9 @@ spoon.SpoonInstall:andUse("ReloadConfiguration", { start = true })
 hs.loadSpoon("Notify")
 
 hs.loadSpoon("HyperKey")
-spoon.HyperKey.notifyFn = function(t, s, d) spoon.Notify:info(t, s, d) end
+spoon.HyperKey.notifyFn = function(t, s, d)
+    spoon.Notify:show{ title = t, body = s, duration = d }
+end
 spoon.HyperKey:start()
 
 hs.loadSpoon("AppLauncher")
@@ -39,7 +41,10 @@ spoon.ScriptMonitor
         script      = spoon.ScriptMonitor:resource("process_monitor.py"),
         intervalSec = params.scriptMonitor.processPollSec,
         args        = params.processMonitor.requiredApps,
-        onOutput    = function(out) spoon.Notify:alert("Process Monitor", out, 5) end,
+        onOutput    = function(out)
+            spoon.Notify:show{ title = "Process Monitor", body = out,
+                               level = "alert", duration = 5 }
+        end,
     })
     :start()
 
@@ -75,8 +80,12 @@ spoon.Crons
 hs.loadSpoon("WindowKit")
 local windowKitOpts = {
     hyperkey = spoon.HyperKey,
-    notifyFn = function(t, s, d) spoon.Notify:info(t, s, d) end,
-    alertFn  = function(t, s, d) spoon.Notify:alert(t, s, d) end,
+    notifyFn = function(t, s, d)
+        spoon.Notify:show{ title = t, body = s, duration = d }
+    end,
+    alertFn  = function(t, s, d)
+        spoon.Notify:show{ title = t, body = s, duration = d, level = "alert" }
+    end,
 }
 for k, v in pairs(params.windowKit or {}) do windowKitOpts[k] = v end
 spoon.WindowKit:configure(windowKitOpts):start()
@@ -84,4 +93,4 @@ spoon.WindowKit:configure(windowKitOpts):start()
 hs.allowAppleScript(true)
 require "hs.ipc"
 
-spoon.Notify:info("Hammerspoon", "Reload finished successfully!")
+spoon.Notify:show{ title = "Hammerspoon", body = "Reload finished successfully!" }

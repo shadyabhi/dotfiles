@@ -6,7 +6,8 @@
 --- check for a configurable interval.
 ---
 --- Requires a banner-capable notify provider with this shape:
----     notify:banner({ title=, lines={...}, level=, onClick=fn(line, idx) })
+---     notify:show({ style="banner", title=, rows={...}, level=,
+---                   onClick=fn(row, idx) })
 --- returning a handle with :hide() and :update(opts). The bundled
 --- Notify spoon satisfies this.
 ---
@@ -62,7 +63,7 @@ end
 function obj:_show()
     local days = math.floor(uptimeDays())
     local title = string.format("Uptime: %d days", days)
-    local lines = {
+    local rows = {
         "Restart suggested — laptop running too long",
         "Click to snooze " .. math.floor(self.snoozeSec / 3600) .. "h",
     }
@@ -72,15 +73,18 @@ function obj:_show()
         self:_hide()
     end
 
+    local opts = {
+        style   = "banner",
+        title   = title,
+        rows    = rows,
+        level   = "alert",
+        onClick = onClick,
+    }
+
     if self._banner then
-        self._banner:update({ title = title, lines = lines, level = "alert", onClick = onClick })
+        self._banner:update(opts)
     else
-        self._banner = self.notify:banner({
-            title   = title,
-            lines   = lines,
-            level   = "alert",
-            onClick = onClick,
-        })
+        self._banner = self.notify:show(opts)
     end
 end
 
@@ -103,8 +107,8 @@ function obj:configure(opts)
 end
 
 function obj:start()
-    if not self.notify or type(self.notify.banner) ~= "function" then
-        hs.printf("[UptimeReminder] notify provider missing :banner(); not starting")
+    if not self.notify or type(self.notify.show) ~= "function" then
+        hs.printf("[UptimeReminder] notify provider missing :show(); not starting")
         return self
     end
     if self._timer then self._timer:stop() end
