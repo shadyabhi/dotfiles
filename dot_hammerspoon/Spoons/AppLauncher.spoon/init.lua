@@ -57,7 +57,7 @@ end
 
 local function launchAndCenter(self, path)
     hs.application.launchOrFocus(path)
-    hs.timer.doAfter(0.3, function() self.mouse.toCenter() end)
+    hs.timer.doAfter(0.3, function() self.mouse.restore() end)
 end
 
 local lastPress = {}
@@ -65,6 +65,7 @@ local DOUBLE_PRESS_WINDOW = 0.6
 
 local function launchApp(self, name)
     return function()
+        self.mouse.save()
         local app = hs.application.find(name)
         local now = hs.timer.secondsSinceEpoch()
         local prev = lastPress[name]
@@ -82,7 +83,7 @@ local function launchApp(self, name)
                     local screen = win:screen()
                     local g = hs.grid.getGrid(screen)
                     hs.grid.set(win, { x = math.floor(g.w / 2), y = 0, w = 1, h = 1 }, screen)
-                    hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+                    hs.timer.doAfter(0.15, function() self.mouse.restore(win) end)
                     return
                 end
                 local idx = 0
@@ -91,7 +92,7 @@ local function launchApp(self, name)
                 end
                 local next = windows[(idx % #windows) + 1]
                 next:focus()
-                hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+                hs.timer.doAfter(0.15, function() self.mouse.restore(next) end)
                 return
             end
         end
@@ -107,13 +108,14 @@ end
 
 local function launchAppChooser(self, name)
     return function()
+        self.mouse.save()
         local app = hs.application.find(name)
         local windows = windowsOnActiveScreen(app)
 
         if #windows == 0 then launchApp(self, name)(); return end
         if #windows == 1 then
             windows[1]:focus()
-            hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+            hs.timer.doAfter(0.15, function() self.mouse.restore(windows[1]) end)
             return
         end
 
@@ -205,7 +207,7 @@ local function launchAppChooser(self, name)
                 cleanup()
                 if w then
                     w:focus()
-                    hs.timer.doAfter(0.15, function() self.mouse.toCenter() end)
+                    hs.timer.doAfter(0.15, function() self.mouse.restore(w) end)
                 end
             end
 
@@ -271,6 +273,7 @@ function obj:bindHotkeys(opts)
     if opts.launchPrefix then self.launchPrefix = opts.launchPrefix end
     if opts.chooserPrefix then self.chooserPrefix = opts.chooserPrefix end
     if not self.hyperkey then error("AppLauncher requires .hyperkey to be set before bindHotkeys") end
+    self.mouse.startTracking()
     for _, s in ipairs(self.apps) do
         local key, name = s[1], s[2]
         self.hyperkey:bind(self.launchPrefix,  key, launchApp(self, name))
