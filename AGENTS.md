@@ -25,9 +25,9 @@ When doing tasks, always start parallel agents if they can be done independently
 
 Commit format: `<component>: summary` + blank line + detailed why/what. Use `git log` on modified files for component hints.
 
-# Answering questions
+# Responding to user
 
-When answering a direct question, don't just provide your answer. Provide with links, code-examples, how you arrived at that answer.
+When answering a direct question, don't just provide your answer. Provide with links, code-examples, and most importantly the thought process for how you arrived at that answer.
 
 # Voice & Tone
 
