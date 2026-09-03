@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+CACHE_FILE="$HOME/.cache/ai/ccusage-pricing.json"
+PRICING_URL="https://raw.githubusercontent.com/ccusage/ccusage/main/rust/crates/ccusage-core/src/models-dev-pricing.json"
+
+choose() {
+  fzf --height=40% --layout=reverse --border --prompt="$1" --exit-0
+}
+
+update_pricing() {
+  local cache_dir temp_file
+  cache_dir="$(dirname "$CACHE_FILE")"
+  mkdir -p "$cache_dir"
+  temp_file="$(mktemp "$cache_dir/ccusage-pricing.json.XXXXXX")"
+  trap 'rm -f "$temp_file"' RETURN
+  curl -L --fail --silent --show-error "$PRICING_URL" -o "$temp_file"
+  jq -e 'type == "object"' "$temp_file" >/dev/null
+  mv "$temp_file" "$CACHE_FILE"
+  trap - RETURN
+  printf 'Updated pricing cache: %s\n' "$CACHE_FILE" >&2
+}
+
+pricing_multiplier() {
+  local model="$1" fallback="$2" multiplier
+  multiplier="$fallback"
+  if [[ -f "$CACHE_FILE" ]] && command -v jq >/dev/null; then
+    multiplier="$(jq -r --arg model "$model" --arg base gpt-5.6-terra '
+      (.[$model].cost) as $cost
+      | (.[$base].cost) as $base_cost
+      | select(
+          $cost.input != null and $cost.output != null
+          and $base_cost.input != null and $base_cost.output != null
+        )
+      | "\((($cost.input / $base_cost.input * 10 | round) / 10))× input / \((($cost.output / $base_cost.output * 10 | round) / 10))× output"
+    ' "$CACHE_FILE" 2>/dev/null || printf '%s' "$fallback")"
+  fi
+  printf '%s' "$multiplier"
+}
+
+args=()
+should_update=false
+for arg in "$@"; do
+  if [[ "$arg" == "--update" ]]; then
+    should_update=true
+  else
+    args+=("$arg")
+  fi
+done
+
+if [[ "$should_update" == true ]]; then
+  update_pricing
+fi
+
+sol_multiplier="$(pricing_multiplier gpt-5.6-sol '2× input / 1.7× output')"
+terra_multiplier="$(pricing_multiplier gpt-5.6-terra '1× input / 1× output')"
+
+selection="$({
+  for effort in low medium high xhigh max ultra; do
+    printf 'gpt-5.6-sol\t%s\t%s\n' "$effort" "$sol_multiplier"
+  done
+  for effort in medium high xhigh max ultra; do
+    printf 'gpt-5.6-terra\t%s\t%s\n' "$effort" "$terra_multiplier"
+  done
+} | choose 'Codex model + effort > ')"
+[[ -n "$selection" ]] || exit 0
+
+IFS=$'\t' read -r model effort _ <<< "$selection"
+
+exec codex --model "$model" --config "model_reasoning_effort=$effort" "${args[@]}"
