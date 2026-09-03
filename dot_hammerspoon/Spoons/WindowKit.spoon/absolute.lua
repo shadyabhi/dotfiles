@@ -28,6 +28,22 @@ local function resizeWidth(delta)
     win:setFrame(f)
 end
 
+local function resizeHeight(delta)
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    local f = win:frame()
+    local max = win:screen():frame()
+    local step = max.h * 0.1
+    local change = step * delta
+    f.h = f.h + change
+    f.y = f.y - (change / 2)
+    if f.h < max.h * 0.1 then f.h = max.h * 0.1 end
+    if f.h > max.h then f.h = max.h end
+    if f.y < max.y then f.y = max.y end
+    if f.y + f.h > max.y + max.h then f.y = max.y + max.h - f.h end
+    win:setFrame(f)
+end
+
 local function placeNumbered(n)
     local win = hs.window.focusedWindow()
     if not win then return end
@@ -59,6 +75,8 @@ function M.bind(parent)
     local hk = parent.hyperkey
     hk:bind("hca", "=", function() resizeWidth(1) end)
     hk:bind("hca", "-", function() resizeWidth(-1) end)
+    hk:bind("hcas", "=", function() resizeHeight(1) end)
+    hk:bind("hcas", "-", function() resizeHeight(-1) end)
     for i = 1, 9 do
         local n = i
         hk:bind("hca", tostring(i), function() placeNumbered(n) end)

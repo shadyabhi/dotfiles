@@ -2,7 +2,7 @@
 ---
 --- Hotkey prefix infrastructure: hyper / hypershift / hyper_cmd_alt.
 --- Cmd+Opt+Delete temporarily disables all hyper_cmd_alt bindings.
---- Usage: spoon.HyperKey:bind("h", "j", fn) where prefix in {"h","hs","hca"}.
+--- Usage: spoon.HyperKey:bind("h", "j", fn) where prefix in {"h","hs","hca","hcas"}.
 
 local obj = {}
 obj.__index = obj
@@ -16,6 +16,7 @@ obj.modifiers = {
     h   = { "cmd", "alt", "ctrl" },
     hs  = { "cmd", "alt", "ctrl", "shift" },
     hca = { "cmd", "alt" },
+    hcas = { "cmd", "alt", "shift" },
 }
 
 obj.panicDuration = 3
@@ -29,7 +30,7 @@ function obj:bind(prefix, key, fn)
     local mods = self.modifiers[prefix]
     if not mods then error("HyperKey: unknown prefix " .. tostring(prefix)) end
     local hk = hs.hotkey.bind(mods, key, fn)
-    if prefix == "hca" then table.insert(hca_hotkeys, hk) end
+    if prefix == "hca" or prefix == "hcas" then table.insert(hca_hotkeys, hk) end
     return hk
 end
 
