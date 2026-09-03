@@ -3,8 +3,14 @@
 set -euo pipefail
 
 choose() {
-  fzf --height=40% --layout=reverse --border --prompt="$1" --exit-0
+  fzf --height=40% --layout=reverse --border --prompt="$1" --query="$fzf_query" --exit-0
 }
+
+if (($# > 1)); then
+  echo "Usage: $(basename "$0") [fzf-query]" >&2
+  exit 2
+fi
+fzf_query="${1:-}"
 
 selection="$(printf '%s\n' \
   $'sonnet\tlow' \
@@ -22,4 +28,4 @@ selection="$(printf '%s\n' \
 
 IFS=$'\t' read -r model effort <<< "$selection"
 
-exec claude --model "$model" --effort "$effort" "$@"
+exec claude --model "$model" --effort "$effort"

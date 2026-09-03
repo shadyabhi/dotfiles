@@ -6,7 +6,7 @@ CACHE_FILE="$HOME/.cache/ai/ccusage-pricing.json"
 PRICING_URL="https://raw.githubusercontent.com/ccusage/ccusage/main/rust/crates/ccusage-core/src/models-dev-pricing.json"
 
 choose() {
-  fzf --height=40% --layout=reverse --border --prompt="$1" --exit-0
+  fzf --height=40% --layout=reverse --border --prompt="$1" --query="$fzf_query" --exit-0
 }
 
 update_pricing() {
@@ -39,15 +39,16 @@ pricing_multiplier() {
   printf '%s' "$multiplier"
 }
 
-args=()
 should_update=false
-for arg in "$@"; do
-  if [[ "$arg" == "--update" ]]; then
-    should_update=true
-  else
-    args+=("$arg")
-  fi
-done
+if [[ "${1:-}" == "--update" ]]; then
+  should_update=true
+  shift
+fi
+if (($# > 1)); then
+  echo "Usage: $(basename "$0") [--update] [fzf-query]" >&2
+  exit 2
+fi
+fzf_query="${1:-}"
 
 if [[ "$should_update" == true ]]; then
   update_pricing
@@ -68,4 +69,4 @@ selection="$({
 
 IFS=$'\t' read -r model effort _ <<< "$selection"
 
-exec codex --model "$model" --config "model_reasoning_effort=$effort" "${args[@]}"
+exec codex --model "$model" --config "model_reasoning_effort=$effort"
