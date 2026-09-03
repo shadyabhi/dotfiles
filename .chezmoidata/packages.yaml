@@ -49,6 +49,7 @@ packages:
     - goreleaser
     - gyb
     - haproxy
+    - http2text
     - hurl
     - imagemagick
     - instantgrep
