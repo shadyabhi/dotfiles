@@ -12,18 +12,14 @@ if (($# > 1)); then
 fi
 fzf_query="${1:-}"
 
-selection="$(printf '%s\n' \
-  $'sonnet\tlow' \
-  $'sonnet\tmedium' \
-  $'sonnet\thigh' \
-  $'sonnet\txhigh' \
-  $'sonnet\tmax' \
-  $'opus\tlow' \
-  $'opus\tmedium' \
-  $'opus\thigh' \
-  $'opus\txhigh' \
-  $'opus\tmax' \
-  | choose 'Claude model + effort > ')"
+selection="$({
+  for effort in low medium high xhigh max; do
+    printf 'sonnet\t%s\n' "$effort"
+  done
+  for effort in low medium high xhigh max; do
+    printf 'opus\t%s\n' "$effort"
+  done
+} | choose 'Claude model + effort > ')"
 [[ -n "$selection" ]] || exit 0
 
 IFS=$'\t' read -r model effort <<< "$selection"
