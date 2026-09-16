@@ -88,16 +88,45 @@ def parse_simple(text):
     return data
 
 
+def filter_rows(rows, only):
+    if only is None:
+        return rows
+    row_name, sep, title_name = only.partition(":")
+    for name, panes in rows:
+        if name != row_name:
+            continue
+        if not sep:
+            return [(name, panes)]
+        for title, cmd in panes:
+            if title == title_name:
+                return [(name, [(title, cmd)])]
+        die(f"--only {only!r}: no pane titled {title_name!r} in row {row_name!r}")
+    die(f"--only {only!r}: no row {row_name!r} in config")
+
+
+def env_prefix(env):
+    """POSIX env-var-for-command prefix, e.g. 'FOO=bar BAZ=qux '.
+
+    Setting vars this way (rather than `export ...;` inside the shell) lets
+    the shell substitute $VAR / ${VAR} natively at runtime for the whole
+    `sh -c` process, with no separate simulation step needed.
+    """
+    return "".join(f"{key}={shlex.quote(val)} " for key, val in (env or {}).items())
+
+
+def full_cmd(cmd, env=None):
+    """The exact command line a pane runs, env prefix included."""
+    return f"{env_prefix(env)}{cmd}"
+
+
 def wrap_cmd(cmd, env=None):
-    exports = "".join(
-        f"export {key}={shlex.quote(val)}; " for key, val in (env or {}).items()
-    )
+    announce = f"echo {shlex.quote(f'Starting cmd: {full_cmd(cmd, env)}')}; "
     inner = (
-        f'{exports}{cmd}; status=$?; '
+        f'{announce}{cmd}; status=$?; '
         f'printf "\\n[exited %s] press enter to close..." "$status"; '
         f'read _'
     )
-    return f"sh -c {shlex.quote(inner)}"
+    return f"{env_prefix(env)}sh -c {shlex.quote(inner)}"
 
 
 def name_exists(name, kind):
@@ -151,6 +180,22 @@ def start_caffeinate(use_window, session, window_name):
     )
 
 
+def print_commands(rows, env):
+    print("tmux-replay: commands to run:", file=sys.stderr)
+    for row_name, panes in rows:
+        for title, cmd in panes:
+            print(f"  [{row_name}:{title}] {full_cmd(cmd, env)}", file=sys.stderr)
+
+
+def confirm_or_abort():
+    try:
+        reply = input("tmux-replay: proceed? [y/N] ")
+    except EOFError:
+        die("aborted (no input available to confirm)")
+    if reply.strip().lower() not in ("y", "yes"):
+        die("aborted by user")
+
+
 def main():
     p = argparse.ArgumentParser(
         prog="tmux-replay",
@@ -160,10 +205,15 @@ def main():
                    help="window/session name (default: config filename stem)")
     p.add_argument("-N", "--new-session", action="store_true",
                    help="force a new tmux session even when inside tmux")
+    p.add_argument("-y", "--yes", action="store_true",
+                   help="skip the confirmation prompt and run immediately")
     p.add_argument("--warn-existing", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="warn if a window/session with the base name already exists "
                         "(default: on; use --no-warn-existing to disable)")
+    p.add_argument("--only", default=None, metavar="ROW[:TITLE]",
+                   help="only build panes from row ROW, or just the pane "
+                        "titled TITLE within it")
     p.add_argument("config", help="path to YAML config file")
     p.add_argument("env", nargs="*",
                    help="env vars to export to pane commands, as key=val")
@@ -177,6 +227,10 @@ def main():
         env[key] = val
 
     rows = load_config(args.config)
+    rows = filter_rows(rows, args.only)
+    print_commands(rows, env)
+    if not args.yes:
+        confirm_or_abort()
     name = args.name or os.path.splitext(os.path.basename(args.config))[0] or "replay"
     inside_tmux = bool(os.environ.get("TMUX"))
     use_window = inside_tmux and not args.new_session
