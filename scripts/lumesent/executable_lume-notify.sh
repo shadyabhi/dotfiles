@@ -5,15 +5,15 @@ GDATE=/opt/homebrew/opt/coreutils/libexec/gnubin/date
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 
 # If first arg looks like a duration (e.g. 5s, 10m, 2h), delay the notification via launchd
-if [[ "$1" =~ ^([0-9]+)([smh])$ ]]; then
+if [[ "$1" =~ ^([0-9]+(\.[0-9]+)?)([smh])$ ]]; then
   delay="$1"
   shift
   num="${match[1]}"
-  unit="${match[2]}"
+  unit="${match[3]}"
   case "$unit" in
-    s) seconds=$num ;;
-    m) seconds=$((num * 60)) ;;
-    h) seconds=$((num * 3600)) ;;
+    s) seconds=$(printf '%.0f' "$num") ;;
+    m) seconds=$(printf '%.0f' "$(echo "$num * 60" | bc)") ;;
+    h) seconds=$(printf '%.0f' "$(echo "$num * 3600" | bc)") ;;
   esac
 
   title="$1"
