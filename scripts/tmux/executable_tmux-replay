@@ -88,9 +88,12 @@ def parse_simple(text):
     return data
 
 
-def wrap_cmd(cmd):
+def wrap_cmd(cmd, env=None):
+    exports = "".join(
+        f"export {key}={shlex.quote(val)}; " for key, val in (env or {}).items()
+    )
     inner = (
-        f'{cmd}; status=$?; '
+        f'{exports}{cmd}; status=$?; '
         f'printf "\\n[exited %s] press enter to close..." "$status"; '
         f'read _'
     )
@@ -162,7 +165,16 @@ def main():
                    help="warn if a window/session with the base name already exists "
                         "(default: on; use --no-warn-existing to disable)")
     p.add_argument("config", help="path to YAML config file")
+    p.add_argument("env", nargs="*",
+                   help="env vars to export to pane commands, as key=val")
     args = p.parse_args()
+
+    env = {}
+    for kv in args.env:
+        key, sep, val = kv.partition("=")
+        if not sep:
+            die(f"invalid env arg {kv!r}: expected key=val")
+        env[key] = val
 
     rows = load_config(args.config)
     name = args.name or os.path.splitext(os.path.basename(args.config))[0] or "replay"
@@ -183,7 +195,7 @@ def main():
             )
 
     first_title, first_cmd = rows[0][1][0]
-    wrapped = wrap_cmd(first_cmd)
+    wrapped = wrap_cmd(first_cmd, env)
 
     if use_window:
         session = tmux("display-message", "-p", "#S", capture=True)
@@ -217,7 +229,7 @@ def main():
         title, cmd = panes[0]
         new_id = tmux(
             "split-window", "-v", "-t", spine_ids[-1],
-            "-P", "-F", "#{pane_id}", wrap_cmd(cmd), capture=True,
+            "-P", "-F", "#{pane_id}", wrap_cmd(cmd, env), capture=True,
         )
         set_title(new_id, title)
         spine_ids.append(new_id)
@@ -227,7 +239,7 @@ def main():
         for title, cmd in panes[1:]:
             new_id = tmux(
                 "split-window", "-h", "-t", anchor,
-                "-P", "-F", "#{pane_id}", wrap_cmd(cmd), capture=True,
+                "-P", "-F", "#{pane_id}", wrap_cmd(cmd, env), capture=True,
             )
             set_title(new_id, title)
 
