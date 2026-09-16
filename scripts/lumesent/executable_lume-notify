@@ -1,0 +1,129 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["humanize"]
+# ///
+import os
+import plistlib
+import re
+import subprocess
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import humanize
+
+LUMESENT = "/Applications/Lumesent.app/Contents/MacOS/Lumesent"
+LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
+
+DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)([smh])$")
+UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600}
+
+
+def send(title, body):
+    subprocess.run([LUMESENT, "send", "--title", title, "--body", body])
+
+
+def schedule_short(seconds, delay_str, title, body):
+    cmd = f'sleep {seconds} && "{LUMESENT}" send --title "{title}" --body "{body}"'
+    subprocess.Popen(["/bin/zsh", "-c", cmd], start_new_session=True)
+    print(f"Notification scheduled in {delay_str} (via background sleep)")
+
+
+def schedule_launchd(fire_at, delay_str, title, body):
+    job_id = f"com.lumesent.notify.{int(fire_at.timestamp())}.{os.getpid()}"
+    plist_path = LAUNCH_AGENTS / f"{job_id}.plist"
+
+    plist = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>{job_id}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>{LUMESENT} send --title \\"${{1}}\\" --body \\"${{2}}\\"; launchctl remove {job_id}; rm -f {plist_path}</string>
+    <string>--</string>
+    <string>{title}</string>
+    <string>{body}</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Month</key>
+    <integer>{fire_at.month}</integer>
+    <key>Day</key>
+    <integer>{fire_at.day}</integer>
+    <key>Hour</key>
+    <integer>{fire_at.hour}</integer>
+    <key>Minute</key>
+    <integer>{fire_at.minute}</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
+'''
+    plist_path.write_text(plist)
+    subprocess.run(["launchctl", "load", str(plist_path)])
+    print(f"Notification scheduled in {delay_str} (at {fire_at.strftime('%Y-%m-%dT%H:%M:%S')})")
+
+
+def list_pending():
+    now = datetime.now()
+    for plist_path in sorted(LAUNCH_AGENTS.glob("com.lumesent.notify.*.plist")):
+        try:
+            with plist_path.open("rb") as f:
+                plist = plistlib.load(f)
+            interval = plist["StartCalendarInterval"]
+        except Exception:
+            print(f"skipping malformed plist: {plist_path}", file=sys.stderr)
+            continue
+
+        fire_at = now.replace(month=interval["Month"], day=interval["Day"],
+                               hour=interval["Hour"], minute=interval["Minute"], second=0)
+        if fire_at < now:
+            fire_at = fire_at.replace(year=now.year + 1)
+
+        title, body = plist["ProgramArguments"][-2:]
+        remaining = humanize.naturaldelta(fire_at - now)
+        print(f"{title}: {body} (in {remaining}, at {fire_at.strftime('%Y-%m-%dT%H:%M:%S')})")
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print("Usage: lume-notify.py [duration] <title> [body...]", file=sys.stderr)
+        sys.exit(1)
+
+    if args[0] == "--list":
+        list_pending()
+        return
+
+    match = DURATION_RE.match(args[0])
+    if match:
+        delay_str = args[0]
+        num, unit = float(match.group(1)), match.group(2)
+        seconds = round(num * UNIT_SECONDS[unit])
+        title = args[1] if len(args) > 1 else ""
+        body = " ".join(args[2:])
+
+        fire_at = datetime.now() + timedelta(seconds=seconds)
+        when = humanize.naturaltime(fire_at)
+        if input(f"Schedule '{title}' for {when}? [y/N] ").strip().lower() != "y":
+            print("Cancelled")
+            return
+
+        if seconds < 60:
+            schedule_short(seconds, delay_str, title, body)
+        else:
+            schedule_launchd(fire_at, delay_str, title, body)
+    else:
+        title = args[0]
+        body = " ".join(args[1:])
+        send(title, body)
+
+
+if __name__ == "__main__":
+    main()
