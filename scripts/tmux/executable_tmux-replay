@@ -32,16 +32,20 @@ import shlex
 import shutil
 import subprocess
 import sys
+from typing import Any, NoReturn, cast
 
 import yaml
 
+Pane = tuple[str, str]
+Row = tuple[str, list[Pane]]
 
-def die(msg, code=1):
+
+def die(msg: str, code: int = 1) -> NoReturn:
     print(f"tmux-replay: {msg}", file=sys.stderr)
     sys.exit(code)
 
 
-def tmux(*args, capture=False):
+def tmux(*args: str, capture: bool = False) -> str:
     try:
         r = subprocess.run(
             ["tmux", *args],
@@ -54,32 +58,35 @@ def tmux(*args, capture=False):
         die("tmux not found in PATH")
     except subprocess.CalledProcessError as e:
         die(f"tmux {' '.join(args)} failed: {(e.stderr or '').strip()}")
-    return r.stdout.strip() if capture else None
+    return r.stdout.strip() if capture else ""
 
 
-def load_config(path):
+def load_config(path: str) -> list[Row]:
     """Returns [(row_name, [(title, cmd), ...]), ...] in config order."""
     try:
-        data = yaml.safe_load(open(path).read())
+        loaded: Any = yaml.safe_load(open(path).read())
     except OSError as e:
         die(f"cannot read {path}: {e}")
     except yaml.YAMLError as e:
         die(f"cannot parse {path}: {e}")
-    if not isinstance(data, dict) or not data:
+    if not isinstance(loaded, dict) or not loaded:
         die("config must be a non-empty mapping of rows")
+    config = cast("dict[Any, Any]", loaded)
 
-    rows = []
-    for row_name, panes in data.items():
+    rows: list[Row] = []
+    for row_name, panes in config.items():
         if not isinstance(panes, dict) or not panes:
             die(f"row {row_name!r} must be a non-empty mapping of title: cmd")
-        for title, cmd in panes.items():
+        row: list[Pane] = []
+        for title, cmd in cast("dict[Any, Any]", panes).items():
             if not isinstance(cmd, str):
                 die(f"{row_name}.{title}: cmd must be a string")
-        rows.append((str(row_name), [(str(t), c) for t, c in panes.items()]))
+            row.append((str(title), cmd))
+        rows.append((str(row_name), row))
     return rows
 
 
-def filter_rows(rows, only):
+def filter_rows(rows: list[Row], only: str | None) -> list[Row]:
     if only is None:
         return rows
     row_name, sep, title_name = only.partition(":")
@@ -95,7 +102,7 @@ def filter_rows(rows, only):
     die(f"--only {only!r}: no row {row_name!r} in config")
 
 
-def full_cmd(cmd, env):
+def full_cmd(cmd: str, env: dict[str, str]) -> str:
     """The exact command line a pane runs, POSIX env-var prefix included.
 
     Setting vars this way (rather than `export ...;` inside the shell) lets
@@ -106,7 +113,7 @@ def full_cmd(cmd, env):
     return f"{prefix}{cmd}"
 
 
-def wrap_cmd(cmd, env):
+def wrap_cmd(cmd: str, env: dict[str, str]) -> str:
     """Pane command: announce it, run it, then hold the pane open on exit."""
     inner = (
         f"echo {shlex.quote(f'Starting cmd: {full_cmd(cmd, env)}')}; {cmd}; status=$?; "
@@ -116,25 +123,28 @@ def wrap_cmd(cmd, env):
     return full_cmd(f"sh -c {shlex.quote(inner)}", env)
 
 
-def existing_names(base, kind):
+def existing_names(base: str, kind: str) -> list[str]:
     """Existing base-N names, from N=0 up to the first free index."""
     if kind == "session":
-        def taken(name):
+        def taken(name: str) -> bool:
             return subprocess.run(
                 ["tmux", "has-session", "-t", name],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             ).returncode == 0
     else:
-        windows = set((tmux("list-windows", "-F", "#W", capture=True) or "").splitlines())
-        taken = windows.__contains__
+        windows = set(tmux("list-windows", "-F", "#W", capture=True).splitlines())
 
-    names = []
+        def taken(name: str) -> bool:
+            return name in windows
+
+    names: list[str] = []
     while taken(f"{base}-{len(names)}"):
         names.append(f"{base}-{len(names)}")
     return names
 
 
-def spawn(tmux_args, title, cmd, env, parts_left=1):
+def spawn(tmux_args: list[str], title: str, cmd: str, env: dict[str, str],
+          parts_left: int = 1) -> str:
     """Runs a pane-creating tmux command, titles the new pane, returns its id.
 
     parts_left is how many equal panes still have to fit inside the target
@@ -148,7 +158,7 @@ def spawn(tmux_args, title, cmd, env, parts_left=1):
     return pane_id
 
 
-def start_caffeinate(session, window_name):
+def start_caffeinate(session: str, window_name: str | None) -> None:
     """Run `caffeinate -d` while the target window/session exists (macOS only)."""
     if sys.platform != "darwin" or not shutil.which("caffeinate"):
         return
@@ -170,7 +180,7 @@ def start_caffeinate(session, window_name):
     )
 
 
-def run_prep(rows, env):
+def run_prep(rows: list[Row], env: dict[str, str]) -> None:
     """Run prep-row commands sequentially in the foreground; abort on failure."""
     for row_name, panes in rows:
         for title, cmd in panes:
@@ -181,7 +191,7 @@ def run_prep(rows, env):
                 die(f"prep step {row_name}:{title} failed (exit {code})")
 
 
-def confirm_or_abort():
+def confirm_or_abort() -> None:
     try:
         reply = input("tmux-replay: proceed? [y/N] ")
     except EOFError:
@@ -190,7 +200,7 @@ def confirm_or_abort():
         die("aborted by user")
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser(
         prog="tmux-replay",
         description="Build a tmux window of titled panes from a YAML config.",
@@ -213,7 +223,7 @@ def main():
                    help="env vars to export to pane commands, as key=val")
     args = p.parse_args()
 
-    env = {}
+    env: dict[str, str] = {}
     for kv in args.env:
         key, sep, val = kv.partition("=")
         if not sep:
@@ -265,7 +275,7 @@ def main():
 
     # Build row spines first (vertical splits off the newest spine pane), then
     # horizontal fills within each row off that row's newest pane.
-    spine_ids = [first_pane]
+    spine_ids: list[str] = [first_pane]
     for i in range(1, len(rows)):
         title, cmd = rows[i][1][0]
         spine_ids.append(spawn(["split-window", "-v", "-t", spine_ids[-1]],

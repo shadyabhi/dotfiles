@@ -1,40 +1,87 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["humanize"]
+# dependencies = ["humanize", "pytimeparse"]
 # ///
 import os
 import plistlib
-import re
 import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import humanize
-
-LUMESENT = "/Applications/Lumesent.app/Contents/MacOS/Lumesent"
-LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
-
-DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)([smh])$")
-UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600}
+from pytimeparse import parse as parse_timespan
 
 
-def send(title, body):
-    subprocess.run([LUMESENT, "send", "--title", title, "--body", body])
+class LumeNotify:
+    BINARY = "/Applications/Lumesent.app/Contents/MacOS/Lumesent"
+    LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
+    JOB_GLOB = "com.lumesent.notify.*.plist"
 
+    _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S"
+    _SHORT_DELAY_THRESHOLD_SECONDS = 60
 
-def schedule_short(seconds, delay_str, title, body):
-    cmd = f'sleep {seconds} && "{LUMESENT}" send --title "{title}" --body "{body}"'
-    subprocess.Popen(["/bin/zsh", "-c", cmd], start_new_session=True)
-    print(f"Notification scheduled in {delay_str} (via background sleep)")
+    # ---------- public API ----------
 
+    @classmethod
+    def parse_duration(cls, token):
+        """Return seconds if token looks like a duration (e.g. '90s', '5m', '2h', '5h20m'), else None."""
+        if not any(c.isalpha() for c in token):
+            return None  # avoid treating bare numbers (e.g. a numeric title) as a duration
+        seconds = parse_timespan(token)
+        return None if seconds is None else round(seconds)
 
-def schedule_launchd(fire_at, delay_str, title, body):
-    job_id = f"com.lumesent.notify.{int(fire_at.timestamp())}.{os.getpid()}"
-    plist_path = LAUNCH_AGENTS / f"{job_id}.plist"
+    def send(self, title, body):
+        subprocess.run([self.BINARY, "send", "--title", title, "--body", body])
 
-    plist = f'''<?xml version="1.0" encoding="UTF-8"?>
+    def schedule(self, seconds, delay_str, title, body):
+        fire_at = datetime.now() + timedelta(seconds=seconds)
+        when = self._format_duration(timedelta(seconds=seconds))
+        prompt = f"Schedule '{title}' in {when} (at {self._format_timestamp(fire_at)})? [Y/n] "
+        if input(prompt).strip().lower() == "n":
+            print("Cancelled")
+            return
+
+        if seconds < self._SHORT_DELAY_THRESHOLD_SECONDS:
+            self._schedule_short(seconds, delay_str, title, body)
+        else:
+            self._schedule_launchd(fire_at, delay_str, title, body)
+
+    def list_pending(self):
+        now = datetime.now()
+        for plist_path in sorted(self.LAUNCH_AGENTS.glob(self.JOB_GLOB)):
+            job = self._read_job(plist_path)
+            if job is None:
+                print(f"skipping malformed plist: {plist_path}", file=sys.stderr)
+                continue
+
+            title, body, fire_at = job
+            remaining = self._format_duration(fire_at - now)
+            print(f"{title}: {body} (in {remaining}, at {self._format_timestamp(fire_at)})")
+
+    # ---------- scheduling internals ----------
+
+    def _schedule_short(self, seconds, delay_str, title, body):
+        cmd = f'sleep {seconds} && "{self.BINARY}" send --title "{title}" --body "{body}"'
+        subprocess.Popen(["/bin/zsh", "-c", cmd], start_new_session=True)
+        print(f"Notification scheduled in {delay_str} (via background sleep)")
+
+    def _schedule_launchd(self, fire_at, delay_str, title, body):
+        job_id = self._job_id(fire_at)
+        plist_path = self._plist_path(job_id)
+        plist_path.write_text(self._render_plist(job_id, plist_path, fire_at, title, body))
+        subprocess.run(["launchctl", "load", str(plist_path)])
+        print(f"Notification scheduled in {delay_str} (at {self._format_timestamp(fire_at)})")
+
+    def _job_id(self, fire_at):
+        return f"com.lumesent.notify.{int(fire_at.timestamp())}.{os.getpid()}"
+
+    def _plist_path(self, job_id):
+        return self.LAUNCH_AGENTS / f"{job_id}.plist"
+
+    def _render_plist(self, job_id, plist_path, fire_at, title, body):
+        return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -44,7 +91,7 @@ def schedule_launchd(fire_at, delay_str, title, body):
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>{LUMESENT} send --title \\"${{1}}\\" --body \\"${{2}}\\"; launchctl remove {job_id}; rm -f {plist_path}</string>
+    <string>{self.BINARY} send --title \\"${{1}}\\" --body \\"${{2}}\\"; launchctl remove {job_id}; rm -f {plist_path}</string>
     <string>--</string>
     <string>{title}</string>
     <string>{body}</string>
@@ -65,30 +112,33 @@ def schedule_launchd(fire_at, delay_str, title, body):
 </dict>
 </plist>
 '''
-    plist_path.write_text(plist)
-    subprocess.run(["launchctl", "load", str(plist_path)])
-    print(f"Notification scheduled in {delay_str} (at {fire_at.strftime('%Y-%m-%dT%H:%M:%S')})")
 
-
-def list_pending():
-    now = datetime.now()
-    for plist_path in sorted(LAUNCH_AGENTS.glob("com.lumesent.notify.*.plist")):
+    def _read_job(self, plist_path):
         try:
             with plist_path.open("rb") as f:
                 plist = plistlib.load(f)
             interval = plist["StartCalendarInterval"]
+            title, body = plist["ProgramArguments"][-2:]
         except Exception:
-            print(f"skipping malformed plist: {plist_path}", file=sys.stderr)
-            continue
+            return None
 
+        now = datetime.now()
         fire_at = now.replace(month=interval["Month"], day=interval["Day"],
                                hour=interval["Hour"], minute=interval["Minute"], second=0)
         if fire_at < now:
             fire_at = fire_at.replace(year=now.year + 1)
+        return title, body, fire_at
 
-        title, body = plist["ProgramArguments"][-2:]
-        remaining = humanize.naturaldelta(fire_at - now)
-        print(f"{title}: {body} (in {remaining}, at {fire_at.strftime('%Y-%m-%dT%H:%M:%S')})")
+    # ---------- formatting internals ----------
+
+    @staticmethod
+    def _format_duration(delta):
+        minimum_unit = "seconds" if delta < timedelta(minutes=1) else "minutes"
+        return humanize.precisedelta(delta, minimum_unit=minimum_unit, format="%d")
+
+    @classmethod
+    def _format_timestamp(cls, dt):
+        return dt.strftime(cls._TIMESTAMP_FMT)
 
 
 def main():
@@ -97,32 +147,22 @@ def main():
         print("Usage: lume-notify.py [duration] <title> [body...]", file=sys.stderr)
         sys.exit(1)
 
+    notifier = LumeNotify()
+
     if args[0] == "--list":
-        list_pending()
+        notifier.list_pending()
         return
 
-    match = DURATION_RE.match(args[0])
-    if match:
+    seconds = LumeNotify.parse_duration(args[0])
+    if seconds is not None:
         delay_str = args[0]
-        num, unit = float(match.group(1)), match.group(2)
-        seconds = round(num * UNIT_SECONDS[unit])
         title = args[1] if len(args) > 1 else ""
         body = " ".join(args[2:])
-
-        fire_at = datetime.now() + timedelta(seconds=seconds)
-        when = humanize.naturaltime(fire_at)
-        if input(f"Schedule '{title}' for {when}? [y/N] ").strip().lower() != "y":
-            print("Cancelled")
-            return
-
-        if seconds < 60:
-            schedule_short(seconds, delay_str, title, body)
-        else:
-            schedule_launchd(fire_at, delay_str, title, body)
+        notifier.schedule(seconds, delay_str, title, body)
     else:
         title = args[0]
         body = " ".join(args[1:])
-        send(title, body)
+        notifier.send(title, body)
 
 
 if __name__ == "__main__":
