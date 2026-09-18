@@ -81,6 +81,7 @@ class LumeNotify:
         return self.LAUNCH_AGENTS / f"{job_id}.plist"
 
     def _render_plist(self, job_id, plist_path, fire_at, title, body):
+        target_epoch = int(fire_at.timestamp())
         return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -91,24 +92,13 @@ class LumeNotify:
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>{self.BINARY} send --title \\"${{1}}\\" --body \\"${{2}}\\"; launchctl remove {job_id}; rm -f {plist_path}</string>
+    <string>remaining=$(( {target_epoch} - $(date +%s) )); if [ "$remaining" -gt 0 ]; then sleep "$remaining"; fi; {self.BINARY} send --title \\"${{1}}\\" --body \\"${{2}}\\"; launchctl remove {job_id}; rm -f {plist_path}</string>
     <string>--</string>
     <string>{title}</string>
     <string>{body}</string>
   </array>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Month</key>
-    <integer>{fire_at.month}</integer>
-    <key>Day</key>
-    <integer>{fire_at.day}</integer>
-    <key>Hour</key>
-    <integer>{fire_at.hour}</integer>
-    <key>Minute</key>
-    <integer>{fire_at.minute}</integer>
-  </dict>
   <key>RunAtLoad</key>
-  <false/>
+  <true/>
 </dict>
 </plist>
 '''
@@ -117,16 +107,12 @@ class LumeNotify:
         try:
             with plist_path.open("rb") as f:
                 plist = plistlib.load(f)
-            interval = plist["StartCalendarInterval"]
+            target_epoch = int(plist["Label"].split(".")[-2])
             title, body = plist["ProgramArguments"][-2:]
         except Exception:
             return None
 
-        now = datetime.now()
-        fire_at = now.replace(month=interval["Month"], day=interval["Day"],
-                               hour=interval["Hour"], minute=interval["Minute"], second=0)
-        if fire_at < now:
-            fire_at = fire_at.replace(year=now.year + 1)
+        fire_at = datetime.fromtimestamp(target_epoch)
         return title, body, fire_at
 
     # ---------- formatting internals ----------
