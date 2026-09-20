@@ -5,14 +5,15 @@ meta:
 packages:
   taps:
     - GrowlyX/instantgrep
-    - umputun/apps/revdiff
     - derailed/k9s
     - goreleaser/tap
     - hashicorp/tap
     - jazzyalex/agent-sessions
     - krishkrosh/apps
+    - raine/workmux/workmux
     - shadyabhi/tap
     - tldev/tap
+    - umputun/apps/revdiff
   brews:
     - act
     - age
