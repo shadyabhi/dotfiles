@@ -80,6 +80,7 @@ packages:
     - uv
     - watch
     - wget
+    - workmux
     - yq
     - yt-dlp
     - zoxide
