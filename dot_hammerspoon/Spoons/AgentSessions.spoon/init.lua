@@ -160,15 +160,11 @@ function obj:start()
         bar:setTitle(title)
     end
 
+    -- `pane` is a tmux pane-id (e.g. "%17"), which resolves to its session and
+    -- window on its own: switch-client alone moves the attached client to it.
     local function focus_pane(pane)
         local tmux = "/opt/homebrew/bin/tmux -S " .. self.tmuxSocket
-        local sess = pane:match("^([^:]+):") or ""
-        local win  = pane:match("^(.+)%.[^.]+$") or pane
-        if sess ~= "" then
-            hs.execute(tmux .. " switch-client -t '" .. sess .. "' 2>/dev/null")
-        end
-        hs.execute(tmux .. " select-window -t '" .. win .. "' 2>/dev/null")
-        hs.execute(tmux .. " select-pane -t '" .. pane .. "' 2>/dev/null")
+        hs.execute(tmux .. " switch-client -t '" .. pane .. "' 2>/dev/null")
         hs.application.launchOrFocus(self.terminalApp)
     end
 
@@ -187,50 +183,15 @@ function obj:start()
         return att ~= nil and tonumber(att) > 0 and win == "1" and pn == "1"
     end
 
-    -- Non-tmux sessions (e.g. Claude in IntelliJ's or VS Code's built-in
-    -- terminal) have no pane to switch to: the shell runs as a descendant of
-    -- the host GUI app, so walk the process tree up from the session's pid
-    -- until a pid resolves to a running application, then raise it.
-    -- Map running app pids once. hs.application.applicationForPID logs a console
-    -- error for every non-app pid, and a process-tree walk hits several before
-    -- reaching the host app; a membership check against this map stays quiet.
-    local function running_app_map()
-        local appByPid = {}
-        for _, a in ipairs(hs.application.runningApplications()) do
-            appByPid[a:pid()] = a
-        end
-        return appByPid
-    end
-
-    -- Non-tmux sessions (e.g. Claude in IntelliJ's or VS Code's built-in
-    -- terminal) have no pane to switch to: the shell runs as a descendant of the
-    -- host GUI app. Walk the process tree up from pid until one resolves to a
-    -- running application.
-    local function app_for_pid(pid, appByPid)
-        pid = tonumber(pid)
-        local seen = {}
-        while pid and pid > 1 and not seen[pid] do
-            seen[pid] = true
-            if appByPid[pid] then return appByPid[pid] end
-            local out = hs.execute("/bin/ps -o ppid= -p " .. pid .. " 2>/dev/null")
-            pid = tonumber((out or ""):match("%d+"))
-        end
-        return nil
-    end
-
-    local function focus_app_for_pid(pid)
-        local app = app_for_pid(pid, running_app_map())
-        if app then app:activate(true) end
-    end
-
-    local function fmt_ago(ms)
-        if not ms or type(ms) ~= "number" then return "?" end
-        local secs = math.max(0, math.floor(os.time() - ms / 1000))
-        if secs < 60 then return secs .. "s ago" end
+    local function fmt_secs(secs)
+        secs = tonumber(secs)
+        if not secs then return "?" end
+        secs = math.max(0, math.floor(secs))
+        if secs < 60 then return secs .. "s" end
         local mins = math.floor(secs / 60)
-        if mins < 60 then return mins .. "m ago" end
+        if mins < 60 then return mins .. "m" end
         local hrs = math.floor(mins / 60)
-        return string.format("%dh%02dm ago", hrs, mins % 60)
+        return string.format("%dh%02dm", hrs, mins % 60)
     end
 
     -- A per-question identity for a waiting session. updated_at changes only when
@@ -349,24 +310,14 @@ function obj:start()
             strokeWidth = 0.5,
         }
 
-        local rowPane, rowPid, rowHiIdx, rowCount = {}, {}, {}, 0
+        local rowPane, rowHiIdx, rowCount = {}, {}, 0
         local cursorY = math.max(pad, math.floor((H - contentH) / 2))
 
-        -- Host-app icon per row: tmux sessions live under the terminal app;
-        -- non-tmux sessions resolve via the process-tree walk. Cache by bundle id
-        -- so repeated lookups (and the same app across rows) cost one fetch.
-        local appByPid = running_app_map()
+        -- Every row is a tmux pane (workmux is tmux-only), so the host icon is
+        -- always the terminal app's; cache the single lookup.
         local termApp = hs.application.find(self.terminalApp)
-        local iconCache = {}
-        local function host_icon(s)
-            local app = s.pane_target and termApp or app_for_pid(s.pid, appByPid)
-            local bid = app and app:bundleID()
-            if not bid then return nil end
-            if iconCache[bid] == nil then
-                iconCache[bid] = hs.image.imageFromAppBundle(bid) or false
-            end
-            return iconCache[bid] or nil
-        end
+        local termIcon = termApp and termApp:bundleID() and hs.image.imageFromAppBundle(termApp:bundleID())
+        local function host_icon(_) return termIcon end
 
         if #visible == 0 then
             c[#c + 1] = {
@@ -392,14 +343,9 @@ function obj:start()
             }
             cursorY = cursorY + headerH
             for _, s in ipairs(list) do
-                -- Count rows explicitly: a non-tmux session has a nil pane_target,
-                -- and `rowPane[#rowPane+1] = nil` is a no-op that would leave the
-                -- array empty, making `total` 0. Store `false` as a dense
-                -- placeholder so every visible row is selectable and dismissible.
                 rowCount = rowCount + 1
                 local rowIdx = rowCount
-                rowPane[rowIdx] = s.pane_target or false
-                rowPid[rowIdx] = s.pid
+                rowPane[rowIdx] = s.pane_target
                 local thisH = rowH + (has_preview(s) and previewH or 0)
                 local hi = #c + 1
                 c[hi] = {
@@ -417,10 +363,18 @@ function obj:start()
 
                 local agent = s.agent or "Agent"
                 local proj  = s.project_name or "?"
-                local name  = s.session_name or s.room_id or ""
+                local name  = s.session_name or ""
                 local left  = agent .. " · " .. proj
                 if name ~= "" then left = left .. " · " .. name end
-                local right = (s.model_display or "?") .. " · " .. (s.context_display or "?") .. " · " .. fmt_ago(s.started_at) .. "  "
+
+                -- Right side surfaces the workmux fields that don't fit on the
+                -- left: branch (when it differs from the project/worktree name),
+                -- the tmux window it lives in, and time in the current status.
+                local rightParts = {}
+                if s.branch and s.branch ~= proj then rightParts[#rightParts + 1] = s.branch end
+                if s.window_name then rightParts[#rightParts + 1] = s.window_name end
+                rightParts[#rightParts + 1] = fmt_secs(s.elapsed_secs) .. " ago"
+                local right = table.concat(rightParts, " · ") .. "  "
 
                 -- Host-app icon, then text offset to clear it. Non-interactive:
                 -- without a tracking flag the click falls through to the row rect.
@@ -547,9 +501,8 @@ function obj:start()
         local function activate()
             if selected < 1 then hide_panel(); return end
             local pane = rowPane[selected]
-            local pid = rowPid[selected]
             hide_panel("user_dismiss")
-            if pane then focus_pane(pane) else focus_app_for_pid(pid) end
+            if pane then focus_pane(pane) end
         end
 
         c:mouseCallback(function(_, evt, elemId)
@@ -649,7 +602,7 @@ function obj:start()
                     if changed then
                         local s = sess_by_tok[pending]
                         dismissed_tokens[pending] = true
-                        if s.pane_target then focus_pane(s.pane_target) else focus_app_for_pid(s.pid) end
+                        if s.pane_target then focus_pane(s.pane_target) end
                     end
                 else
                     show_panel(true)                   -- new/undismissed question: auto-pop
