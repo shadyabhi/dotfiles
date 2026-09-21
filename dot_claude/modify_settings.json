@@ -9,7 +9,7 @@
 {{- else -}}
 {{-   $data = $data | setValueAtPath "model" "opus" -}}
 {{- end -}}
-{{- $data = $data | setValueAtPath "outputStyle" "default" -}}
+{{- $data = $data | setValueAtPath "outputStyle" "Concise" -}}
 {{- $data = $data | setValueAtPath "prefersReducedMotion" false -}}
 {{- $data = $data | setValueAtPath "cleanupPeriodDays" 99999 -}}
 {{- $data = $data | setValueAtPath "includeCoAuthoredBy" false -}}
