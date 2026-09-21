@@ -1,1 +1,0 @@
-/Users/abhijeetr/AGENTS.md
