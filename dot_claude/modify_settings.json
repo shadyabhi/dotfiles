@@ -66,4 +66,4 @@
 {{-     $_ := set $data.enabledPlugins $plugin true -}}
 {{-   end -}}
 {{- end -}}
-{{ $data | toPrettyJson -}}
+{{ $data | toPrettyJson | trimSuffix "\n" -}}
