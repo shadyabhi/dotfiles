@@ -1,0 +1,34 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- $current := "{}" -}}
+{{- if and (hasKey .chezmoi "stdin") .chezmoi.stdin -}}
+{{-   $current = .chezmoi.stdin -}}
+{{- end -}}
+{{- $data := fromJson $current -}}
+{{- /* --- Hooks ---------------------------------------------------------- */ -}}
+{{- $workmuxWaitingHook := dict "type" "command" "command" "workmux set-window-status waiting" -}}
+{{- $permissionRequestGroup := list (dict "hooks" (list $workmuxWaitingHook)) -}}
+
+{{- $workmuxWorkingHook := dict "type" "command" "command" "workmux set-window-status working" -}}
+{{- $postToolUseGroup := list (dict "hooks" (list $workmuxWorkingHook)) -}}
+
+{{- $workmuxRegisterHook := dict "type" "command" "command" "workmux register-agent" -}}
+{{- $sessionStartGroup := list (dict "matcher" "startup|resume|clear" "hooks" (list $workmuxRegisterHook)) -}}
+
+{{- $workmuxDoneHook := dict "type" "command" "command" "workmux set-window-status done" -}}
+{{- $stopGroup := list (dict "hooks" (list $workmuxDoneHook)) -}}
+
+{{- $subagentStartGroup := list (dict "hooks" (list $workmuxWorkingHook)) -}}
+{{- $subagentStopGroup := list (dict "hooks" (list $workmuxWorkingHook)) -}}
+{{- $userPromptSubmitGroup := list (dict "hooks" (list $workmuxWorkingHook)) -}}
+
+{{- $hooks := dict
+      "PermissionRequest" $permissionRequestGroup
+      "PostToolUse"        $postToolUseGroup
+      "SessionStart"       $sessionStartGroup
+      "Stop"               $stopGroup
+      "SubagentStart"      $subagentStartGroup
+      "SubagentStop"       $subagentStopGroup
+      "UserPromptSubmit"   $userPromptSubmitGroup
+-}}
+{{- $data = $data | setValueAtPath "hooks" $hooks -}}
+{{ printf "%s\n" ($data | toPrettyJson | trimSuffix "\n") -}}
