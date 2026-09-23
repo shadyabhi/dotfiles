@@ -30,8 +30,11 @@ STATUS_ORDER = {"Input": 0, "Working": 1, "Idle": 2}
 
 
 def run_text(args: list[str]) -> str:
+    # Hammerspoon's launchd environment omits /opt/homebrew/bin, so workmux's
+    # internal `tmux` invocations (run without a full path) fail with ENOENT.
+    env = {**os.environ, "PATH": f"/opt/homebrew/bin:{os.environ.get('PATH', '')}"}
     try:
-        return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL)
+        return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, env=env)
     except (subprocess.CalledProcessError, FileNotFoundError, PermissionError, OSError):
         return ""
 
