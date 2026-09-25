@@ -65,6 +65,7 @@
 {{- if not (hasKey $data.permissions "allow") -}}
 {{-   $_ := set $data.permissions "allow" list -}}
 {{- end -}}
+{{- $_ := set $data.permissions "defaultMode" "plan" -}}
 {{- range $perms -}}
 {{-   if not (has . $data.permissions.allow) -}}
 {{-     $_ := set $data.permissions "allow" (append $data.permissions.allow .) -}}
