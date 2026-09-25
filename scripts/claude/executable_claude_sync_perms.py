@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync local Claude permissions to chezmoi template via fzf selection."""
+"""Sync local Claude permissions to the chezmoi-managed JSON merge layer via fzf selection."""
 
 import json
 import subprocess
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 SETTINGS_LOCAL = Path(".claude/settings.local.json")
-ALLOW_PERMS = Path.home() / ".local/share/chezmoi/.chezmoitemplates/claude_allow_permissions"
+MANAGED_SETTINGS = Path.home() / ".local/share/chezmoi/.json_merges/claude/settings.json"
 
 if not SETTINGS_LOCAL.exists():
     print(f"No settings.local.json found at {SETTINGS_LOCAL}")
@@ -18,9 +18,12 @@ if not local_perms:
     print("No permissions found in settings.local.json")
     sys.exit(0)
 
-ALLOW_PERMS.parent.mkdir(parents=True, exist_ok=True)
-ALLOW_PERMS.touch()
-existing = set(ALLOW_PERMS.read_text().splitlines())
+if not MANAGED_SETTINGS.exists():
+    print(f"No managed settings file found at {MANAGED_SETTINGS}")
+    sys.exit(1)
+
+managed = json.loads(MANAGED_SETTINGS.read_text())
+existing = set(managed.get("permissions", {}).get("allow", []))
 
 new_perms = [p for p in local_perms if p not in existing]
 if not new_perms:
@@ -39,9 +42,10 @@ if not selected:
     print("No permissions selected.")
     sys.exit(0)
 
-with ALLOW_PERMS.open("a") as f:
-    for perm in selected:
-        f.write(perm + "\n")
-        print(f"Added: {perm}")
+managed.setdefault("permissions", {}).setdefault("allow", []).extend(selected)
+MANAGED_SETTINGS.write_text(json.dumps(managed, indent=2) + "\n")
+
+for perm in selected:
+    print(f"Added: {perm}")
 
 print(f"Added {len(selected)} new permission(s). Run 'chezmoi apply' to update.")

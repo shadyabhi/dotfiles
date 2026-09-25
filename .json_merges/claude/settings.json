@@ -1,0 +1,106 @@
+{
+  "model": "opus",
+  "outputStyle": "Concise",
+  "prefersReducedMotion": false,
+  "cleanupPeriodDays": 99999,
+  "includeCoAuthoredBy": false,
+  "CLAUDE_CODE_NO_FLICKER": 1,
+  "fullscreen": true,
+  "statusLine": {
+    "type": "command",
+    "command": "python3 ~/.claude/statusline-command.py"
+  },
+  "permissions": {
+    "defaultMode": "plan",
+    "allow": [
+      "Bash(find)",
+      "Bash(make run:*)",
+      "Bash(du:*)",
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(npx vite:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vitx)",
+      "mcp__chrome-devtools__get_network_request",
+      "Bash(npm run:*)",
+      "Bash(npx wrangler:*)",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__list_network_requests",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__hover",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__chrome-devtools__get_console_message",
+      "WebSearch",
+      "Bash(./.go doc:*)",
+      "Bash(./.go list:*)",
+      "Bash(./.go build:*)",
+      "Bash(./.go version:*)",
+      "Bash(make test:*)",
+      "Bash(./.go test:*)"
+    ]
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/notification.sh" }
+        ]
+      },
+      {
+        "matcher": "permission_prompt|elicitation_dialog",
+        "hooks": [
+          { "type": "command", "command": "workmux set-window-status waiting" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 ~/.claude/hooks/permission-audit.py", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "workmux set-window-status working" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|fork",
+        "hooks": [
+          { "type": "command", "command": "workmux register-agent" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/stop.sh" }
+        ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "workmux set-window-status done" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "workmux set-window-status working" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "enabledPlugins": {
+    "pluginA": false,
+    "pluginB": true
+  },
+  "scalarFlag": false,
+  "count": 0,
+  "list": ["x", "y"],
+  "hooks": {
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "managed-notify" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "managed-stop" }] }
+    ]
+  },
+  "model": "device-model"
+}

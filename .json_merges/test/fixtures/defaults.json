@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "pluginA": true,
+    "pluginB": true
+  }
+}

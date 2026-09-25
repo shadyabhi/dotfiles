@@ -1,0 +1,19 @@
+{
+  "apiKeyHelper": "if [ $A -lt $B ] && echo \"a<b && b>a\" | grep '&'; then echo ok; fi",
+  "enabledPlugins": {
+    "pluginA": true,
+    "pluginB": true
+  },
+  "scalarFlag": false,
+  "count": 0,
+  "list": ["x", "y"],
+  "hooks": {
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "managed-notify" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "managed-stop" }] }
+    ]
+  },
+  "model": "device-model"
+}

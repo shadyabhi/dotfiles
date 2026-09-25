@@ -1,0 +1,4 @@
+{
+  "apiKeyHelper": "some-helper",
+  "env": { "FOO": "bar" }
+}

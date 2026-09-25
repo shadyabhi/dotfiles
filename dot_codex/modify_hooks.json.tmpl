@@ -1,0 +1,4 @@
+{{- /* chezmoi:modify-template */ -}}
+#!/bin/bash
+exec {{ joinPath .chezmoi.sourceDir ".json_merges/merge.sh" | quote }} \
+  --merge {{ joinPath .chezmoi.sourceDir ".json_merges/codex/hooks.json" | quote }}

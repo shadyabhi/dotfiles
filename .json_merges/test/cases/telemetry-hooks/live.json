@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "ConfigChange": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "telemetry-configchange" }] }
+    ],
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "telemetry-notify" }] }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "managed-notify" }] }
+    ]
+  }
+}
