@@ -24,10 +24,10 @@ When doing tasks, always start parallel agents if they can be done independently
 - Comments: 
   - Write concise comments, only when code isn't explanatory and when doing code-changes, ensure that comments are up-to-date as well.
   - When reading comments, don't blindly accept claims, always use code to infer the real intent.
-
-## Git
-
-Commit format: `<component>: summary` + blank line + detailed why we did it, how we solved it, BUT concisely /simple-english, not more than 100,200 words, as concise as possible. Use `git log` on modified files for component hints.
+- Git:
+  - Commit format: `<component>: summary` + blank line + detailed why we did it, how we solved it, BUT concisely /simple-english, not more than 100,200 words, as concise as possible. Use `git log` on modified files for component hints.
+- Creating PR:
+  - Keep description concise, use /simple-english skill. Context only enough to review PR, and why this is needed.
 
 # Responding to user
 
