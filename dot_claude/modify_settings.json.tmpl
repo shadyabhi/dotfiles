@@ -1,6 +1,6 @@
 {{- /* chezmoi:modify-template */ -}}
 #!/bin/bash
-exec {{ joinPath .chezmoi.sourceDir ".json_merges/merge.sh" | quote }} --no-trailing-newline \
+exec python3 {{ joinPath .chezmoi.sourceDir ".json_merges/merge.py" | quote }} --no-trailing-newline \
   --defaults {{ joinPath .chezmoi.sourceDir ".json_merges/claude/settings.defaults.json" | quote }} \
   --merge {{ joinPath .chezmoi.sourceDir ".json_merges/claude/settings.json" | quote }} \
   --merge {{ joinPath .chezmoi.sourceDir (printf ".json_merges/claude/settings.%s.json" .chezmoi.config.data.device_type) | quote }}

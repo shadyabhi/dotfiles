@@ -1,4 +1,4 @@
 {{- /* chezmoi:modify-template */ -}}
 #!/bin/bash
-exec {{ joinPath .chezmoi.sourceDir ".json_merges/merge.sh" | quote }} \
+exec python3 {{ joinPath .chezmoi.sourceDir ".json_merges/merge.py" | quote }} \
   --merge {{ joinPath .chezmoi.sourceDir ".json_merges/codex/hooks.json" | quote }}
