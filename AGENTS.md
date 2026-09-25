@@ -27,7 +27,7 @@ When doing tasks, always start parallel agents if they can be done independently
 
 ## Git
 
-Commit format: `<component>: summary` + blank line + detailed why/what. Use `git log` on modified files for component hints.
+Commit format: `<component>: summary` + blank line + detailed why we did it, how we solved it, BUT concisely /simple-english, not more than 100,200 words, as concise as possible. Use `git log` on modified files for component hints.
 
 # Responding to user
 
