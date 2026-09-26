@@ -35,13 +35,17 @@ class LumeNotify:
     def send(self, title, body):
         subprocess.run([self.BINARY, "send", "--title", title, "--body", body])
 
-    def schedule(self, seconds, delay_str, title, body):
+    def schedule(self, seconds, delay_str, title, body, assume_yes=False):
         fire_at = datetime.now() + timedelta(seconds=seconds)
         when = self._format_duration(timedelta(seconds=seconds))
-        prompt = f"Schedule '{title}' in {when} (at {self._format_timestamp(fire_at)})? [Y/n] "
-        if input(prompt).strip().lower() == "n":
-            print("Cancelled")
-            return
+        if not assume_yes:
+            if not sys.stdin.isatty():
+                print("stdin is not a TTY; pass --yes to schedule without confirmation", file=sys.stderr)
+                sys.exit(1)
+            prompt = f"Schedule '{title}' in {when} (at {self._format_timestamp(fire_at)})? [Y/n] "
+            if input(prompt).strip().lower() == "n":
+                print("Cancelled")
+                return
 
         if seconds < self._SHORT_DELAY_THRESHOLD_SECONDS:
             self._schedule_short(seconds, delay_str, title, body)
@@ -129,8 +133,11 @@ class LumeNotify:
 
 def main():
     args = sys.argv[1:]
+    assume_yes = "--yes" in args or "-y" in args
+    args = [a for a in args if a not in ("--yes", "-y")]
+
     if not args:
-        print("Usage: lume-notify.py [duration] <title> [body...]", file=sys.stderr)
+        print("Usage: lume-notify [--yes] [duration] <title> [body...]", file=sys.stderr)
         sys.exit(1)
 
     notifier = LumeNotify()
@@ -144,7 +151,7 @@ def main():
         delay_str = args[0]
         title = args[1] if len(args) > 1 else ""
         body = " ".join(args[2:])
-        notifier.schedule(seconds, delay_str, title, body)
+        notifier.schedule(seconds, delay_str, title, body, assume_yes=assume_yes)
     else:
         title = args[0]
         body = " ".join(args[1:])
