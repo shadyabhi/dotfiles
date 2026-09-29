@@ -3,3 +3,7 @@ nerdfont: true
 sidebar:
   position: top
   height: "10%"
+
+files:
+  symlink:
+    - .venv
