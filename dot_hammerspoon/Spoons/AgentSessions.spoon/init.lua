@@ -42,11 +42,11 @@ local PANEL_KEYS = {
 
 local SETTING_AUTO_FOCUS = "AgentSessions.autoFocus"
 
--- Focus the lone waiting session instead of popping the panel. Defaults on:
--- an unset key is not the same as an explicit false.
+-- Focus the lone waiting session instead of popping the panel. Defaults off:
+-- an unset key is not the same as an explicit true.
 local function auto_focus_enabled()
     local v = hs.settings.get(SETTING_AUTO_FOCUS)
-    if v == nil then return true end
+    if v == nil then return false end
     return v and true or false
 end
 
