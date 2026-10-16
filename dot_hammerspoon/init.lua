@@ -14,6 +14,9 @@ spoon.SpoonInstall:andUse("ReloadConfiguration", { start = true })
 -- Local spoons
 hs.loadSpoon("Notify")
 
+hs.loadSpoon("Caffeinate")
+spoon.Caffeinate:start()
+
 hs.loadSpoon("HyperKey")
 spoon.HyperKey.notifyFn = function(t, s, d)
     spoon.Notify:show{ title = t, body = s, duration = d }
@@ -48,10 +51,10 @@ spoon.ScriptMonitor
     })
     :start()
 
-hs.loadSpoon("AgentSessions")
-spoon.AgentSessions
-    :configure({ hotkey = params.agentSessions.hotkey })
-    :start()
+--hs.loadSpoon("AgentSessions")
+-- spoon.AgentSessions
+--    :configure({ hotkey = params.agentSessions.hotkey })
+--   :start()
 
 hs.loadSpoon("Pomodoro")
 spoon.Pomodoro
