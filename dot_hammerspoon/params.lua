@@ -76,6 +76,7 @@ return {
             "BetterDisplay",
             "FluidVoice",
             "Alfred",
+            "Meeting Bar",
         },
     },
 
