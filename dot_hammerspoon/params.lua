@@ -82,6 +82,7 @@ return {
 
     audioDevice = {
         preferredOutput = {
+		    "LS50 Wireless Speaker",
             "Bose QC Ultra 2 Earbuds",
             "Abhijeet's EX",
             "Abhijeet's Beoplay H100",
