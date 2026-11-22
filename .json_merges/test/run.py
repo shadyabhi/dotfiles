@@ -46,11 +46,17 @@ def check_case(name, case_dir, log):
         log(f"FAIL {name}: output does not match expected.json\n  got:      {actual!r}\n  expected: {json.dumps(want)!r}")
         return False
 
-    if name == "html-escape":
-        for esc in ("\\u003c", "\\u003e", "\\u0026"):
-            if esc not in actual:
-                log(f"FAIL {name}: expected Go-style {esc} escaping in raw output")
-                return False
+    # Style follows the live file: escaping of < > & and the trailing newline.
+    for esc in ("\\u003c", "\\u003e", "\\u0026"):
+        if (esc in stdin_text) != (esc in actual):
+            log(f"FAIL {name}: {esc} escaping does not match the live file's style")
+            return False
+    if stdin_text.strip() and stdin_text.endswith("\n") != actual.endswith("\n"):
+        log(f"FAIL {name}: trailing newline does not match the live file")
+        return False
+    if "\u2014" in stdin_text and "\\u2014" in actual:
+        log(f"FAIL {name}: non-ASCII characters were escaped")
+        return False
 
     # Idempotence: feeding the output back through the same layers must not change it.
     rerun = run_merge(actual, BASE_ARGS)

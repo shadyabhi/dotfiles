@@ -31,7 +31,7 @@ return {
         { "i", "IntelliJ IDEA" },
         { "r", "Reclaim" },
         { "s", "Slack" },
-        { "t", "iTerm" },
+        { "t", "Rex" },
         { "m", "Google Meet" },
         { "w", "Obsidian" },
     },

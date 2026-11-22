@@ -13,7 +13,8 @@ overlays" plan for the contract.
                     (including false/0); arrays are unioned by deep
                     equality, live items first in live order, then overlay
                     items not already present, in overlay order.
-  --no-trailing-newline  omit the trailing newline chezmoi would otherwise get
+  --no-trailing-newline  omit the trailing newline when the live file is empty
+                    (otherwise the live file's trailing newline is kept)
 """
 import argparse
 import json
@@ -56,6 +57,17 @@ def deepmerge(a, b):
     return b
 
 
+def escape_html(live_text):
+    """Whether to write < > & as \\u003c \\u003e \\u0026. Follows whichever
+    style the live file already uses, so apply never churns it: Go's
+    encoding/json (the Netflix claude/codex wrapper) escapes, Claude Code
+    itself does not. Defaults to Go's style when the live file shows neither
+    (all escape characters are only ever inside string values)."""
+    if any(e in live_text for e in ("\\u003c", "\\u003e", "\\u0026")):
+        return True
+    return not any(c in live_text for c in "<>&")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--defaults")
@@ -63,7 +75,8 @@ def main():
     parser.add_argument("--no-trailing-newline", action="store_true")
     args = parser.parse_args()
 
-    result = load_json("stdin", sys.stdin.read())
+    live_text = sys.stdin.read()
+    result = load_json("stdin", live_text)
 
     if args.defaults and Path(args.defaults).is_file():
         result = deepfill(result, load_json(args.defaults, Path(args.defaults).read_text()))
@@ -72,15 +85,14 @@ def main():
         if Path(path).is_file():
             result = deepmerge(result, load_json(path, Path(path).read_text()))
 
-    out = json.dumps(result, indent=2)
-    # Match Go's encoding/json HTMLEscape, which chezmoi's toPrettyJson used
-    # to apply, so re-running apply doesn't reintroduce a diff against what
-    # the Netflix claude/codex wrapper (also Go's encoding/json) writes back.
-    # Safe as a plain replace: these characters only occur inside JSON
-    # string values, never as structural characters.
-    out = out.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    out = json.dumps(result, indent=2, ensure_ascii=False)
+    if escape_html(live_text):
+        out = out.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
-    sys.stdout.write(out if args.no_trailing_newline else out + "\n")
+    # Follow the live file's trailing newline; the flag only decides when
+    # there is no live content to copy from.
+    newline = live_text.endswith("\n") if live_text.strip() else not args.no_trailing_newline
+    sys.stdout.write(out + "\n" if newline else out)
 
 
 if __name__ == "__main__":

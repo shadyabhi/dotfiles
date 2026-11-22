@@ -1,0 +1,4 @@
+{
+  "apiKeyHelper": "if [ $A -lt $B ] && echo \"a<b && b>a\" | grep '&'; then echo ok; fi",
+  "note": "em dash — here"
+}

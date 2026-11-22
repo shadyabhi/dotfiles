@@ -1,0 +1,14 @@
+PASS empty-live
+PASS enabled-plugins
+PASS extra-perms
+PASS foreign-keys
+PASS html-escape
+PASS no-dup-hook
+PASS scalar-false-wins
+PASS style-raw-live
+PASS telemetry-hooks
+PASS invalid-live-json
+PASS missing-merge-file-skipped
+PASS unknown-argument
+
+== 12 passed, 0 failed ==

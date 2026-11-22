@@ -31,4 +31,4 @@ echo "Added to delete list: $target"
 
 git -C "$source_dir" add "$remove_file"
 git -C "$source_dir" commit -q -m "chezmoi: add $target to delete list"
-echo "Committed. Run cm_sync (or chezmoi apply) to push and remove it everywhere."
+echo "Committed. Run cm_sync.sh (or chezmoi apply) to push and remove it everywhere."

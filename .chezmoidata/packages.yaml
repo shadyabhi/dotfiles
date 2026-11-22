@@ -35,6 +35,7 @@ packages:
     - diffnav
     - direnv
     - displayplacer
+    - exiftool
     - ffmpeg
     - flock
     - fx
@@ -67,6 +68,7 @@ packages:
     - parallel
     - pipx
     - raine/claude-history/claude-history
+    - raine/workmux/workmux
     - ripgrep
     - rtmpdump
     - sops
@@ -77,7 +79,6 @@ packages:
     - tree-sitter-cli
     - urlview
     - uv
-    - raine/workmux/workmux
     - watch
     - wget
     - yq

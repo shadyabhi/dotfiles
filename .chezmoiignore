@@ -2,3 +2,6 @@
 # background auto-sync). Tracking it in chezmoi causes constant conflicts,
 # so it's left unmanaged and resolved per-machine.
 .config/nvim/lazy-lock.json
+
+# Repo-only AGENTS.md for this source dir; the global one is dot_agents/AGENTS.md.
+AGENTS.md
