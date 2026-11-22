@@ -1,6 +1,6 @@
 ---
 name: chezmoi-sync
-description: Syncs edited dotfiles to chezmoi, commits them with a descriptive message, then runs the user's cm_sync.sh workflow. Only trigger when explicitly requested by name or via /chezmoi-sync. Do NOT trigger automatically from conversational mentions.
+description: Syncs edited dotfiles to chezmoi, commits them with a descriptive message, then runs the user's cm_sync workflow. Only trigger when explicitly requested by name or via /chezmoi-sync. Do NOT trigger automatically from conversational mentions.
 ---
 
 # Chezmoi Sync
@@ -65,17 +65,17 @@ git commit -m "<commit message>"
 After the commit succeeds, run the user's sync script:
 
 ```bash
-~/scripts/chezmoi/cm_sync.sh
+~/scripts/chezmoi/cm_sync
 ```
 
 The script fetches the Bitwarden session from macOS Keychain, then runs the remote sync and `chezmoi apply`. Commit before running the script so the skill controls the commit message non-interactively; with no staged changes left, the script's own commit step should be a no-op.
 
 ### Step 6: Confirm
 
-Tell the user what was synced, show the commit message used, and mention that `cm_sync.sh` completed. If any files failed to add, mention those too.
+Tell the user what was synced, show the commit message used, and mention that `cm_sync` completed. If any files failed to add, mention those too.
 
 ## Edge cases
 
 - **File not managed by chezmoi yet**: `chezmoi add` handles this — it starts managing the file. No special treatment needed.
 - **No changes to commit**: If `git commit` says there's nothing to commit, tell the user their chezmoi repo is already up to date.
-- **Sync script fails**: Show the error from `~/scripts/chezmoi/cm_sync.sh` and stop. Don't force-push or auto-resolve pull/rebase conflicts.
+- **Sync script fails**: Show the error from `~/scripts/chezmoi/cm_sync` and stop. Don't force-push or auto-resolve pull/rebase conflicts.

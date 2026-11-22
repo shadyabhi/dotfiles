@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -e
+
+KEYCHAIN_SERVICE="bw-session"
+KEYCHAIN_ACCOUNT="${USER:-$(id -un)}"
+
+if [ -z "${BW_SESSION:-}" ] || ! bw unlock --check >/dev/null 2>&1; then
+    stored=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null) || stored=""
+    if [ -n "$stored" ] && BW_SESSION="$stored" bw unlock --check >/dev/null 2>&1; then
+        BW_SESSION="$stored"
+    else
+        if ! BW_SESSION=$(bw unlock --raw); then
+            echo "Failed to unlock Bitwarden vault" >&2
+            exit 1
+        fi
+        if ! security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w "$BW_SESSION"; then
+            echo "Warning: Could not save Bitwarden session in Keychain" >&2
+        fi
+    fi
+fi
+
+export BW_SESSION
+exec chezmoi status "$@"
