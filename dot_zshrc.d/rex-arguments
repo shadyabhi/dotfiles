@@ -1,0 +1,1 @@
+[[ -n $REX_SESSION ]] && source "$HOME/.config/rex/mods/prompt/argument-picker.zsh"
