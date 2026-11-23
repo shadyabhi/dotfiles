@@ -3,13 +3,11 @@
 --- Menubar (system tray) widget for agent session status. Polls a
 --- JSON-emitting script. The title shows only non-zero status counts.
 --- Menubar click and hotkey both toggle the canvas panel; the panel also
---- auto-shows when any session needs user input. Selecting a row focuses its
---- tmux pane.
+--- auto-shows only sessions whose workmux status has awaited input for a minute.
+--- Selecting a row focuses its tmux pane. Manual opens show all sessions.
 ---
---- By default a session needing input is focused directly and the panel is not
---- shown at all; the panel is then only reachable by hotkey or tray click. A
---- toggle at its bottom turns that off, restoring the auto-popup. The choice
---- persists across reloads in hs.settings.
+--- By default a session needing input opens the panel. A toggle at its bottom
+--- enables direct focus instead. The choice persists across reloads in hs.settings.
 
 local obj = {}
 obj.__index = obj
@@ -41,6 +39,7 @@ local PANEL_KEYS = {
 }
 
 local SETTING_AUTO_FOCUS = "AgentSessions.autoFocus"
+local WAITING_DELAY_SEC = 60
 
 -- Focus the lone waiting session instead of popping the panel. Defaults off:
 -- an unset key is not the same as an explicit true.
@@ -128,8 +127,9 @@ function obj:start()
     local blink_on, last_sessions = true, {}
     local panel_auto_shown = false
     local dismissed_tokens = {}   -- per-question tokens the user dismissed and that are still pending
-    local waiting_now = {}        -- tokens of sessions waiting on the latest refresh (for dismiss bookkeeping)
     local last_sig = ""           -- signature of the waiting set, to detect changes
+    local waiting_since = {}
+    local actionable_sessions = {}
 
     -- Concise title: only non-zero counts appear, in 🔔/🤔/💤 priority order.
     -- The 🔔 segment blinks red↔dim while any session is blocked. When nothing
@@ -194,11 +194,10 @@ function obj:start()
         return string.format("%dh%02dm", hrs, mins % 60)
     end
 
-    -- A per-question identity for a waiting session. updated_at changes only when
-    -- the session takes a new turn (Claude freezes it while waiting and bumps it on
-    -- the next question), so dismissing one question never suppresses the next one.
+    -- Key a waiting request by workmux pane and status timestamp, so dismissing
+    -- one request does not suppress a later request in the same pane.
     local function session_token(s)
-        return (s.agent or "?") .. ":" .. (s.session_id or s.cwd or "?")
+        return (s.pane_target or s.session_id or s.cwd or "?")
             .. "@" .. tostring(s.updated_at or s.started_at or 0)
     end
 
@@ -241,7 +240,9 @@ function obj:start()
             panel:delete(); panel = nil; state.panel = nil
         end
         if reason == "user_dismiss" then
-            for _, tok in ipairs(waiting_now) do dismissed_tokens[tok] = true end
+            for _, s in ipairs(panel_auto_shown and actionable_sessions or last_sessions) do
+                if s.status == "Input" then dismissed_tokens[session_token(s)] = true end
+            end
         end
         panel_auto_shown = false
     end
@@ -254,14 +255,16 @@ function obj:start()
         end
         if prev then prev:delete(); panel = nil; state.panel = nil end
 
-        local order = { "Input", "Working", "Idle" }
+        -- Automatic prompts offer only actions the user can take now. The tray
+        -- and hotkey still provide the full session overview on demand.
+        local order = was_auto and { "Input" } or { "Input", "Working", "Idle" }
         local headers = {
             Input   = { icon = "🔔", label = "Waiting for input", color = { red = 1.00, green = 0.55, blue = 0.30, alpha = 1 } },
             Working = { icon = "🤔", label = "Working",           color = { red = 0.45, green = 0.75, blue = 1.00, alpha = 1 } },
             Idle    = { icon = "💤", label = "Idle",              color = { white = 0.70, alpha = 1 } },
         }
         local groups = { Input = {}, Working = {}, Idle = {} }
-        for _, s in ipairs(last_sessions) do
+        for _, s in ipairs(was_auto and actionable_sessions or last_sessions) do
             local g = groups[s.status]
             if g then g[#g + 1] = s else groups.Idle[#groups.Idle + 1] = s end
         end
@@ -365,7 +368,9 @@ function obj:start()
                 local proj  = s.project_name or "?"
                 local name  = s.session_name or ""
                 local left  = agent .. " · " .. proj
-                if name ~= "" then left = left .. " · " .. name end
+                if name ~= "" and name ~= s.branch and name ~= proj then
+                    left = left .. " · " .. name
+                end
 
                 -- Right side surfaces the workmux fields that don't fit on the
                 -- left: branch (when it differs from the project/worktree name),
@@ -399,6 +404,7 @@ function obj:start()
                     textColor = { white = 0.92 },
                     textSize = 20,
                     textFont = "Menlo",
+                    textLineBreak = "truncateTail",
                     frame = { x = textX, y = cursorY + 11, w = W * 0.55 - (textX - pad), h = rowH - 8 },
                 }
                 c[#c + 1] = {
@@ -411,6 +417,7 @@ function obj:start()
                     textSize = 18,
                     textFont = "Menlo",
                     textAlignment = "right",
+                    textLineBreak = "truncateTail",
                     frame = { x = W * 0.55, y = cursorY + 13, w = W * 0.45 - pad, h = rowH - 8 },
                 }
                 if has_preview(s) then
@@ -423,6 +430,7 @@ function obj:start()
                         textColor = { red = 1.00, green = 0.80, blue = 0.55, alpha = 0.85 },
                         textSize = 16,
                         textFont = "Menlo",
+                        textLineBreak = "truncateTail",
                         frame = { x = pad + 4, y = cursorY + rowH - 2, w = W - 2 * pad - 4, h = previewH },
                     }
                 end
@@ -551,15 +559,25 @@ function obj:start()
     state.toggle_panel = toggle_panel
 
     maybe_auto_panel = function(waiting_sessions)
-        -- Same waiting set the 🔔 count is built from; key each entry per-question.
+        -- Track all requests for dismissal, but offer only requests old enough
+        -- to interrupt. Missing workmux ages fall back to continuous observation.
         local cur, tokens, sess_by_tok = {}, {}, {}
+        local now = hs.timer.absoluteTime() / 1e9
+        actionable_sessions = {}
         for _, s in ipairs(waiting_sessions) do
             local tok = session_token(s)
             cur[tok] = true
-            tokens[#tokens + 1] = tok
-            sess_by_tok[tok] = s
+            waiting_since[tok] = waiting_since[tok] or now
+            local age = tonumber(s.elapsed_secs) or (now - waiting_since[tok])
+            if age >= WAITING_DELAY_SEC and not dismissed_tokens[tok] then
+                tokens[#tokens + 1] = tok
+                sess_by_tok[tok] = s
+                actionable_sessions[#actionable_sessions + 1] = s
+            end
         end
-        waiting_now = tokens
+        for tok in pairs(waiting_since) do
+            if not cur[tok] then waiting_since[tok] = nil end
+        end
         -- Drop dismissals for questions that are no longer pending, so the next
         -- question (a fresh token) re-arms the popup on its own.
         for tok in pairs(dismissed_tokens) do
@@ -570,7 +588,7 @@ function obj:start()
         local changed = sig ~= last_sig
         last_sig = sig
 
-        if #waiting_sessions == 0 then
+        if #actionable_sessions == 0 then
             if panel and panel_auto_shown then hide_panel() end
             return
         end
@@ -609,7 +627,7 @@ function obj:start()
                 end
             end
         elseif changed then
-            show_panel(unseen and true or panel_auto_shown)  -- keep an open panel current
+            show_panel(panel_auto_shown)  -- refresh without changing the panel's purpose
         end
     end
 

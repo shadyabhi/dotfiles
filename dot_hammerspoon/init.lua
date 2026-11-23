@@ -51,10 +51,10 @@ spoon.ScriptMonitor
     })
     :start()
 
---hs.loadSpoon("AgentSessions")
--- spoon.AgentSessions
---    :configure({ hotkey = params.agentSessions.hotkey })
---   :start()
+hs.loadSpoon("AgentSessions")
+ spoon.AgentSessions
+    :configure({ hotkey = params.agentSessions.hotkey })
+   :start()
 
 hs.loadSpoon("Pomodoro")
 spoon.Pomodoro

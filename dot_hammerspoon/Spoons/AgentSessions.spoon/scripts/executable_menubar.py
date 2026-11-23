@@ -95,7 +95,9 @@ def to_detail(agent: dict) -> dict:
     updated_ts = agent.get("updated_ts")
 
     return {
-        "agent": (agent.get("agent_kind") or "Agent").capitalize(),
+        # workmux owns discovery and status; agent_kind can outlive the process
+        # that set it and must not identify the session in the panel.
+        "agent": "Workmux",
         "project_name": project or worktree,
         "session_name": title,
         "worktree": worktree,

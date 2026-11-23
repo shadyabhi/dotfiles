@@ -29,7 +29,6 @@ return {
         { "e", "Microsoft Edge" },
         { "g", "Gmail" },
         { "i", "IntelliJ IDEA" },
-        { "r", "Reclaim" },
         { "s", "Slack" },
         { "t", "Rex" },
         { "m", "Google Meet" },

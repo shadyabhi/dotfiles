@@ -32,6 +32,7 @@ packages:
     - codex
     - coreutils
     - curl
+    - deepanshumishraa/tap/leaf
     - diffnav
     - direnv
     - displayplacer
