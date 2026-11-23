@@ -14,7 +14,7 @@ You manage `~/.claude/settings.json` through chezmoi's modify-script mechanism. 
 ~/.local/share/chezmoi/.json_merges/claude/settings.defaults.json  # fill-missing-only (e.g. enabledPlugins)
 ```
 
-`dot_claude/modify_settings.json.tmpl` just wires these into `.json_merges/merge.py`, which reads the live file on stdin and writes the merged result to stdout. It should not normally need editing.
+`private_dot_claude/modify_settings.json.tmpl` just wires these into `.json_merges/merge.py`, which reads the live file on stdin and writes the merged result to stdout. It should not normally need editing.
 
 ### How it works
 
@@ -22,7 +22,7 @@ You manage `~/.claude/settings.json` through chezmoi's modify-script mechanism. 
 
 - **defaults**: fills in a path only if the live file doesn't already have it. A plugin the user disabled locally stays disabled.
 - **merge** (`settings.json`, then the device-specific file): objects merge recursively; scalars are overwritten by the overlay's value (including `false`/`0`); arrays are unioned — live items keep their position, missing overlay items are appended. This is what makes `permissions.allow` and each `hooks.<Event>` array additive: foreign entries (e.g. the Netflix telemetry hooks written by `/opt/nflx/bin/claude`) survive, and a managed entry already present is never duplicated.
-- Key order and formatting always follow the live file, so `chezmoi apply` doesn't create diff churn.
+- Unchanged JSON is returned byte-for-byte. Changed JSON keeps key order and follows the live file's HTML escaping and trailing newline.
 
 ### Your workflow
 
@@ -37,16 +37,15 @@ You manage `~/.claude/settings.json` through chezmoi's modify-script mechanism. 
 ### Important
 
 - These are plain JSON files — no template syntax, so standard JSON tooling (formatters, linters) works directly on them.
-- Never hand-edit `dot_claude/modify_settings.json.tmpl` for a settings change; it's plumbing, not content.
-- `scripts/claude/executable_claude_sync_perms.py` appends locally-added permissions from `~/.claude/settings.local.json` straight into `settings.json`'s `permissions.allow` — no more `.chezmoitemplates/claude_allow_permissions` text file.
+- Never hand-edit `private_dot_claude/modify_settings.json.tmpl` for a settings change; it's plumbing, not content.
 - After editing, run `.json_merges/test/run.py` if you touched `merge.py`; for a plain content edit, `chezmoi diff` is enough.
 
 ### Conventions
 
-- **Codex hooks** follow the same flow: edit `.json_merges/codex/hooks.json` (no defaults layer, no `--no-trailing-newline`), wired by `dot_codex/modify_hooks.json.tmpl`.
-- **Never `chezmoi add` a file that has a `modify_` template.** A plain `dot_codex/hooks.json` next to `modify_hooks.json.tmpl` makes chezmoi fail with "inconsistent state" for that target.
+- **Codex hooks** follow the same flow: edit `.json_merges/codex/hooks.json` (no defaults layer, no `--no-trailing-newline`), wired by `private_dot_codex/modify_private_hooks.json.tmpl`.
+- **Never `chezmoi add` a file that has a `modify_` template.** A plain hooks JSON source next to its `modify_` template makes chezmoi fail with "inconsistent state" for that target.
 - **Do not pin hooks injected by apps** (Orca, Rex session-start). Only workmux and our own hooks are managed. To drop an injected hook, delete it from the live file; if the app re-adds it, uninstall the app.
 - **Project-specific keys stay out** of the overlays (e.g. `autoMode` for a single repo). Overlays hold global, device-wide config only.
 - **Where a key goes:** enforced everywhere in `settings.json`; per device in `settings.<device_type>.json`; user-toggleable (plugins) in `settings.defaults.json`.
-- **Output style follows the live file:** 2-space indent, non-ASCII kept raw, and `<`, `>`, `&` are escaped (`<`, ...) only if the live file already escapes them (Go's `encoding/json`, as the Netflix wrapper writes). The trailing newline is also copied from the live file. This is what keeps `chezmoi diff` empty.
+- **Output style:** unchanged JSON is returned byte-for-byte. Changed JSON uses 2-space indent, keeps non-ASCII raw, and follows the live file's HTML escaping and trailing newline. If the live file has no HTML characters, HTML escaping defaults to Go's `encoding/json` style.
 - **Retiring an entry:** remove it from the overlay and from the live file, then run `chezmoi diff` to confirm no re-add.

@@ -2,8 +2,8 @@
 """Generic chezmoi modify-script backend.
 
 Reads the live file's current content on stdin, layers plain-JSON files on
-top of it, writes the merged result to stdout. See the "Readable JSON
-overlays" plan for the contract.
+top of it, writes the merged result to stdout. Unchanged JSON is returned
+byte-for-byte, preserving its formatting, escaping, and trailing newline.
 
   --defaults FILE  fill-missing-only layer (optional, applied first): fills
                     a path only if the live file doesn't already have it.
@@ -75,8 +75,10 @@ def main():
     parser.add_argument("--no-trailing-newline", action="store_true")
     args = parser.parse_args()
 
-    live_text = sys.stdin.read()
+    original = sys.stdin.buffer.read()
+    live_text = original.decode("utf-8")
     result = load_json("stdin", live_text)
+    before = json.dumps(result, sort_keys=True)
 
     if args.defaults and Path(args.defaults).is_file():
         result = deepfill(result, load_json(args.defaults, Path(args.defaults).read_text()))
@@ -84,6 +86,10 @@ def main():
     for path in args.merge:
         if Path(path).is_file():
             result = deepmerge(result, load_json(path, Path(path).read_text()))
+
+    if original.strip() and json.dumps(result, sort_keys=True) == before:
+        sys.stdout.buffer.write(original)
+        return
 
     out = json.dumps(result, indent=2, ensure_ascii=False)
     if escape_html(live_text):

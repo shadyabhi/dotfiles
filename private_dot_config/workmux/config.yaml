@@ -1,3 +1,4 @@
+confirm_unmerged_removal: false
 nerdfont: true
 
 sidebar:
@@ -6,4 +7,21 @@ sidebar:
 
 files:
   symlink:
-    - .venv
+  - .venv
+
+remotes:
+agents:
+  work-start-codex:
+    type: codex
+    command: python3
+    args:
+    - -c
+    - "import os, sys\nfrom pathlib import Path\nargs = sys.argv[1:]\nprompt = None\n\
+      if '--work-start-prompt' in args:\n    index = args.index('--work-start-prompt')\n\
+      \    path = Path(args[index + 1])\n    if path.exists():\n        prompt = path.read_bytes().decode('utf-8')\n\
+      \        path.unlink()\n    del args[index:index + 2]\nif '--' in args:\n  \
+      \  separator = args.index('--')\n    prompt = args[separator + 1:]\n    args
+      = args[:separator] + ['\\n' + value for value in prompt]\nif isinstance(prompt,
+      str) and prompt:\n    args.append('\\n' + prompt)\nos.execvp('codex', ['codex',
+      *args])\n"
+    - --no-daemon

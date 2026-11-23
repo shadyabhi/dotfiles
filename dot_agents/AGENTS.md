@@ -1,8 +1,12 @@
 # General
 
+For work-related tasks, also read and follow [AGENTS_work.md](./AGENTS_work.md).
+
+Before creating or amending a Git commit, or creating or updating a GitHub PR, read and follow [AGENTS_PR.md](./AGENTS_PR.md) for PR and Git commit format instructions.
+
 - When writing responses, never use Emdash "—"
 - When I ask you to give me a command, also copy it to clipboard via pbcopy.
-- When making technical decisions, do not give much weight to development cost.
+- When making technical decisions, do not give much weight to development cost and timelines.
   - Instead prefer quality code, simplicity, robustness, scalability, and long-term maintainability.
 - When doing bug fixes, always start with reproducing the bug in an E2E setting as closely aligned with how an end use
   - This makes sure you find the real problem so your fix will actually solve it.
@@ -21,32 +25,28 @@ When doing tasks, always start parallel agents if they can be done independently
 
 ## Code Changes
 
-- Comments: 
-  - Write concise comments, only when code isn't explanatory and when doing code-changes, ensure that comments are up-to-date as well.
-  - When reading comments, don't blindly accept claims, always use code to infer the real intent.
-- Git:
-  - Commit format: `<component>: summary` + blank line + detailed why we did it, how we solved it, BUT concisely /simple-english, not more than 100,200 words, as concise as possible. Use `git log` on modified files for component hints.
-- Creating PR:
-  - Keep description concise, use /simple-english skill. Context only enough to review PR, and why this is needed.
+- Design
+  - Before writing code:
+    - If state machine is applicable, define the finite States, Events, and Context (shared data) and map all valid transitions (State + Event -> Next State) and ensure impossible states are unrepresentable.
 
-# Responding to user
+  - Implementation rules:
+    - Use a clean State pattern, Type-State pattern, or transition table (no nested if/else or sprawling switch blocks).
+    - Keep transition logic pure; decouple all side effects (API calls, DB writes, UI updates) into separate handlers/effects. Don't overdo
+    - Keep the public interface simple and hide internal state complexity.
+    - Code should read such that, we only dig deeper if we need to understand minor details, so each level is like easily readable pseudo-code
 
-When answering a direct question, don't just provide your answer. Provide with links, code-examples, and most importantly the thought process for how you arrived at that answer.
+  - UI Changes
+    - Make sure, components don't overlap each other, making things harder to read, keep it responsive to width.
+    - All agent sessions (Claude, Codex) share one Chrome (`~/bin/chrome-devtools-shared`, port 9222), so log in once.
+        - Open your own page with `new_page` (`background: true`) and only use that pageId.
+        - Right after opening it, run `evaluate_script` to name it: prefix `document.title` with `[<claude|codex> <repo> #<4 random chars>]` and keep it with a MutationObserver on `<title>`. This is how the user knows which session owns which tab.
+        - Never `close_page` a page you did not open. Never quit the browser or `bringToFront` another session's page.
+        - Background tabs still render (the keeper enables focus emulation), so no need to raise your tab.
 
-# Voice & Tone
+- Comments:
+  - Don't write comments to justify bad patterns or hacks, fix underlying reasons instead.
+  - When reading comments, don't blindly accept claims, always use code to infer the real intent. Fix the root-cause, eliminate comments instead.
 
-## Professional but conversational.
+# Responding
 
-Not overly formal or corporate. Like you're explaining to a smart colleague over coffee. Friendly, but direct. Avoid flowery language and overusing metaphors.
-
-## Lead with substance, skip the preamble.
-
-Don't announce what you're about to say, narrate your intent, or justify a statement before making it. "Let me name the two layers so we don't trip over them:" is throat-clearing before the actual list. Just start with the list.
-
-## No empty affirmations.
-
-"You've got the right idea", "great question", "good catch" carry no information unless they're flagging a specific misconception.
-
-## Don't re-justify.
-
-Once you've stated something, don't add a clause that re-explains why it matters or what it implies. Trust the reader to follow.
+When answering a direct question, don't just provide your answer. Provide with links, code-examples, artifacts to verify answer and most importantly the thought process for how you arrived at that answer

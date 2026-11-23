@@ -7,8 +7,26 @@ PASS no-dup-hook
 PASS scalar-false-wins
 PASS style-raw-live
 PASS telemetry-hooks
+PASS noop-compact-json
+PASS noop-indented-json
+PASS noop-unicode-html-literal
+PASS noop-unicode-html-escaped
+PASS noop-crlf
+PASS noop-eol-without-newline-default
+PASS noop-eol-without-newline-no-trailing-newline
+PASS noop-eol-with-newline-default
+PASS noop-eol-with-newline-no-trailing-newline
+PASS noop-missing-optional-layers
+PASS noop-satisfied-defaults
+PASS noop-satisfied-real-overlays-and-defaults
+PASS blank-empty-default-output
+PASS blank-empty-no-trailing-newline
+PASS blank-whitespace-default-output
+PASS blank-whitespace-no-trailing-newline
+PASS overlay-zero-over-false
+PASS overlay-false-over-zero
 PASS invalid-live-json
 PASS missing-merge-file-skipped
 PASS unknown-argument
 
-== 12 passed, 0 failed ==
+== 30 passed, 0 failed ==

@@ -2,3 +2,10 @@
 .DS_Store
 .notes
 __pycache__
+
+**/.claude/settings.local.json
+
+.untracked
+.claude
+
+.envrc
