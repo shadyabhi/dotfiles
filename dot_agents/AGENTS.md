@@ -1,8 +1,8 @@
 # General
 
-For work-related tasks, also read and follow [AGENTS_work.md](./AGENTS_work.md).
-
-Before creating or amending a Git commit, or creating or updating a GitHub PR, read and follow [AGENTS_PR.md](./AGENTS_PR.md) for PR and Git commit format instructions.
+For work-related tasks, also read and follow [AGENTS_work.md](./AGENTS_work.md), other files are for public consumption.
+Before creating or amending a Git commit, read and follow [AGENTS_git.md](./AGENTS_git.md).
+Before creating or updating a GitHub PR, read and follow [AGENTS_PR.md](./AGENTS_PR.md).
 
 - When writing responses, never use Emdash "—"
 - When I ask you to give me a command, also copy it to clipboard via pbcopy.
