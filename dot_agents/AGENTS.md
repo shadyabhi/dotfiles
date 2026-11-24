@@ -1,8 +1,8 @@
 # General
 
-For work-related tasks, also read and follow [AGENTS_work.md](./AGENTS_work.md), other files are for public consumption.
-Before creating or amending a Git commit, read and follow [AGENTS_git.md](./AGENTS_git.md).
-Before creating or updating a GitHub PR, read and follow [AGENTS_PR.md](./AGENTS_PR.md).
+[AGENTS_work.md](./AGENTS_work.md): Read and follow for work-related tasks. Keep organizational tooling, internal URLs, and work-specific procedures here. Keep all other AGENTS files publicly shareable.
+[AGENTS_git.md](./AGENTS_git.md): Read and follow before creating or amending a Git commit.
+[AGENTS_PR.md](./AGENTS_PR.md): Read and follow before creating or updating a GitHub PR.
 
 - When writing responses, never use Emdash "—"
 - When I ask you to give me a command, also copy it to clipboard via pbcopy.
@@ -49,4 +49,6 @@ When doing tasks, always start parallel agents if they can be done independently
 
 # Responding
 
-When answering a direct question, don't just provide your answer. Provide with links, code-examples, artifacts to verify answer and most importantly the thought process for how you arrived at that answer
+- When responding in a session, any response, don't just provide the result. Provide how we arrived with the current hypothesis, communicate like a story, how we arrived at the answer. (API calls done, sources used, codepath links etc).
+
+- When providing artifacts, just don't share a "dump" which is unreviewable (JSON/csv etc). If that's what you used, run some commands on top, to analyze what's really needed to validate the output. And share that flow instead.
