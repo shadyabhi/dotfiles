@@ -4,7 +4,7 @@ require 'tmpdir'
 require 'fileutils'
 
 # Exercise real open file descriptors, including delegated threads and damaged logs.
-resolver = File.join(__dir__, 'codex-cwd.rb')
+resolver = File.join(__dir__, '..', 'agent-cwd.rb')
 Dir.mktmpdir('rex-codex-cwd-') do |directory|
   checkout = File.join(directory, 'checkout')
   worktree = File.join(directory, "worktree with ' quotes")

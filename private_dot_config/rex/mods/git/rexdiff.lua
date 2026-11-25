@@ -1,20 +1,10 @@
-return function(directory)
-
-  local function codex_dir(process)
-    if not process or not process.pid then return end
-    local executable = process.invoked_path or process.path or process.script or ""
-    if not executable:match("/codex$") and not executable:match("/codex/versions/") then return end
-    local result = rex.exec{ "/usr/bin/ruby", directory .. "/codex-cwd.rb", tostring(math.floor(process.pid)) }
-    if not result or not result.ok then return end
-    local cwd = result.stdout and result.stdout:match("([^\r\n]+)")
-    if cwd and cwd ~= "" then return cwd end
-  end
+return function(directory, process_directory)
 
   local function pane_dir(block_id)
     local terminal = "com.superlogical.terminal"
     local process = rex.block.call(terminal, "process", { block_id = block_id })
     local foreground = process and process.foreground
-    local cwd = codex_dir(foreground) or (foreground and foreground.cwd)
+    local cwd = process_directory(foreground)
     if cwd and cwd ~= "" then return cwd end
     local result = rex.block.call(terminal, "pwd", { block_id = block_id })
     return result and result.pwd
