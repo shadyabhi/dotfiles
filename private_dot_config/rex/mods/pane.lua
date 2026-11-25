@@ -5,3 +5,4 @@ rex.bind("ctrl+a>l", "pane.focus", { direction = "right", wrap = false })
 
 rex.bind("ctrl+a>s", "pane.split", { direction = "down" })
 rex.bind("ctrl+a>v", "pane.split", { direction = "right" })
+rex.bind("ctrl+a>b", "pane.move_to_new_tab")
