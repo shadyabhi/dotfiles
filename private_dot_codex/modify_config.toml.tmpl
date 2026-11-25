@@ -1,0 +1,5 @@
+{{- /* chezmoi:modify-template */ -}}
+#!/bin/sh
+exec pipx run --quiet --spec 'tomlkit==0.13.3' python \
+  {{ joinPath .chezmoi.sourceDir ".toml_merges/merge.py" | quote }} \
+  --merge {{ joinPath .chezmoi.sourceDir ".toml_merges/codex/config.toml" | quote }}

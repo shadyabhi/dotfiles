@@ -1,0 +1,19 @@
+Codex chezmoi TOML merge E2E
+
+chezmoi: /opt/homebrew/bin/chezmoi
+python: 3.15.2
+
+PASS add-missing-section
+PASS replace-existing-value
+PASS add-value-to-existing-section
+PASS create-empty-config
+PASS create-empty-file
+PASS preserve-nested-tables-and-arrays
+PASS already-allowed-byte-noop
+PASS malformed-live-keeps-target
+PASS missing-overlay-keeps-target
+PASS malformed-overlay-keeps-target
+PASS table-type-conflict-keeps-target
+PASS newline-conventions
+
+Result: 12 passed, 0 failed

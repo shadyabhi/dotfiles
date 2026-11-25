@@ -1,0 +1,5 @@
+--- before/config.toml
++++ after/config.toml
+@@ -6 +6 @@
+-default_app_access = "deny" # replace only the managed value
++default_app_access = "allow" # replace only the managed value
