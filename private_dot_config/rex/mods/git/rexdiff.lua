@@ -23,7 +23,7 @@ return function(directory)
   rex.action{
     name = "rexdiff_show",
     title = "revdiff: Open Changes",
-    description = "Opens changes, including untracked files, in the focused pane's Codex worktree or process directory.",
+    description = "Opens changes in the focused pane's Codex worktree or process directory and copies completed annotations to the clipboard.",
     category = "Git",
     keywords = "git diff changes revdiff rexdiff untracked",
     run = function(ctx)
@@ -42,7 +42,7 @@ return function(directory)
         layout = { block = {
           flavor = "com.superlogical.terminal.shell",
           label = "revdiff",
-          options = { cwd = cwd, command = { "/opt/homebrew/bin/revdiff", "--untracked" } },
+          options = { cwd = cwd, command = { "/bin/sh", directory .. "/revdiff-clipboard.sh", "--untracked" } },
         } },
       })
       if not result then error("revdiff: " .. tostring(err), 0) end

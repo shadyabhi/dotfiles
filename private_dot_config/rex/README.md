@@ -14,5 +14,9 @@ process and uses its latest turn directory. Delegated agent logs are excluded.
 It uses macOS’s Ruby and `lsof`, without choosing among unrelated worktrees.
 Run `ruby mods/git/verify-codex-cwd.rb` to verify resolution with real open logs.
 
+When a review finishes, its annotations are printed and copied to the macOS
+clipboard. Empty reviews and failed commands leave the clipboard unchanged.
+The helper also preserves revdiff's optional exit code 10 for annotations.
+
 After changing the configuration, use Rex's config check and reload commands.
 See the Rex [configuration documentation](https://www.superlogical.com/rex/docs/customize/config).
