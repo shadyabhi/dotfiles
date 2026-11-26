@@ -5,8 +5,7 @@ For Git commits made as part of a PR, follow [AGENTS_git.md](./AGENTS_git.md).
 ## Creating PR
 
 - Use the template below, adapted from Ashlee M. Boyer.
-- Keep the description concise and conversational, with enough context for a reviewer unfamiliar with the work.
-- Use the simple-english skill.
+- Description conversational, use ASD-STE100 (without limit on words)
 - Use the following headings in this order. Omit sections that do not apply instead of adding filler.
 
   ```markdown
