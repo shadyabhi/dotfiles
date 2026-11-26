@@ -5,7 +5,7 @@ The configuration is organized by responsibility under `mods/`. The root
 
 | Module | Contents | Guide |
 | --- | --- | --- |
-| `mods/pane.lua` | Ctrl+A followed by h/j/k/l focuses left/down/up/right without wrapping; s splits horizontally with a new pane below; v splits vertically with a new pane on the right; b breaks the focused pane into its own window (tab) in the same session. | |
+| `mods/pane.lua` | Ctrl+A followed by c creates a new tab; h/j/k/l focuses left/down/up/right without wrapping; s splits horizontally with a new pane below; v splits vertically with a new pane on the right; b breaks the focused pane into its own window (tab) in the same session. | |
 | `mods/prompt/` | Shell word movement and the previous-argument picker. | [Prompt controls and setup](mods/prompt/README.md) |
 | `mods/process-directory.lua`, `mods/agent-cwd.rb` | Shared directory lookup: active Codex or Claude session directory when available, otherwise foreground process cwd. | |
 | `mods/git/` | `revdiff --untracked` action and Ctrl+Cmd+D shortcut, using the shared directory lookup. | |
@@ -22,6 +22,8 @@ clipboard. Empty reviews and failed commands leave the clipboard unchanged.
 The helper also preserves revdiff's optional exit code 10 for annotations.
 
 After changing the configuration, use Rex's config check and reload commands.
+The pane module uses `require` so Rex includes it in the configuration hash
+and clients refresh their shortcuts when it changes.
 See the Rex [configuration documentation](https://www.superlogical.com/rex/docs/customize/config).
 
 The s/v splits query the existing pane's foreground process at keypress time,

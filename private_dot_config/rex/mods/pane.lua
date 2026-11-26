@@ -1,4 +1,5 @@
 return function(process_directory)
+  rex.bind("ctrl+a>c", "client.tab.new")
   rex.bind("ctrl+a>h", "pane.focus", { direction = "left", wrap = false })
   rex.bind("ctrl+a>j", "pane.focus", { direction = "down", wrap = false })
   rex.bind("ctrl+a>k", "pane.focus", { direction = "up", wrap = false })
