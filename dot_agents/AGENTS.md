@@ -23,6 +23,8 @@
 
 When doing tasks, always start parallel agents if they can be done independently. Then, you can analyze the agent results and continue with next steps.
 
+For work across repositories, start a separate Codex session for each repository in a Rex tab within the same session. Each session owns its repository’s changes, tests, commits, and PR. The original session coordinates dependencies and verifies the final outcome.
+
 ## Code Changes
 
 - Design
@@ -52,3 +54,9 @@ When doing tasks, always start parallel agents if they can be done independently
 - When responding in a session, any response, don't just provide the result. Provide how we arrived with the current hypothesis, communicate like a story, how we arrived at the answer. (API calls done, sources used, codepath links etc).
 
 - When providing artifacts, just don't share a "dump" which is unreviewable (JSON/csv etc). If that's what you used, run some commands on top, to analyze what's really needed to validate the output. And share that flow instead.
+
+# Summarizing
+
+- When asked to summarize, use ASD-STE100, but don't focus on work limits and always provide evidence. (inlined)
+  - If explanation, communicate like a story, sequence of events with evidence.
+  - If investigating, use a timeline format, explanation delays between events, the how/why and providing a TL;DR in the end.
